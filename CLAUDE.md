@@ -13,12 +13,12 @@ For the full AI agent guide, see [AGENTS.md](file:///Volumes/ExtDisk01/Projects/
 
 ## Essential API Patterns
 
-### 1. Initialize SDK
+### 1. Initialize SDK (2-Tier Routing)
 ```csharp
 HighbrowSDK.Initialize(new HighbrowConfig
 {
     AppKey = "YOUR_APP_KEY",
-    ServerMode = "DEV",
+    UseSandbox = false, // true for dev/test, false for production
     Region = "kr",
     EnableLog = true,
     AutoSessionTracking = true

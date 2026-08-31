@@ -21,7 +21,7 @@
 
 > **사용 방법:**
 > 1. Cursor Composer / GitHub Copilot Chat / Claude에 아래 프롬프트를 전체 복사해 붙여넣습니다.
-> 2. AI가 프로젝트 상황에 대한 **사전 질문(신규 유저/첫 결제 판별 가능 여부, IAP/광고 플러그인 종류 등)**을 제시합니다.
+> 2. AI가 프로젝트 상황에 대한 **사전 질문(테스트 환경, 신규 유저/첫 결제 판별 가능 여부 등)**을 제시합니다.
 > 3. 답변을 입력하면 AI가 **맞춤형 연동 계획**을 제시하고 승인을 요청합니다.
 > 4. 승인 후 AI가 프로젝트 코드를 안전하게 순차 수정합니다.
 
@@ -43,9 +43,11 @@
 
 프로젝트 환경과 여건에 맞게 안전하게 연동하기 위해 다음 질문에 답변해 주세요:
 
-### 1. SDK 기본 정보
+### 1. SDK 기본 정보 및 환경 모드
 - 하이브로 발급 **AppKey**: (예: `YOUR_APP_KEY`)
-- 타겟 환경: `DEV` / `QA` / `PROD` 중 선택 (기본: `DEV`)
+- 테스트/배포 모드:
+  - [ ] **(A) 개발/테스트 모드:** `UseSandbox = true` (샌드박스 수집 서버로 자동 전송)
+  - [ ] **(B) 라이브 상용 배포:** `UseSandbox = false` (Production 수집 서버로 자동 전송)
 - 서버 리전: `kr` / `us` / `dev` / `qa` 등 (기본: `kr`)
 
 ### 2. 유저 식별자 (SUID) 및 로그인
@@ -91,18 +93,22 @@
 
 ## 🏛 특징 및 아키텍처 원칙
 
-1. **Namespace 및 모듈 분리:**
+1. **2단계 자동 엔드포인트 라우팅 (Sandbox vs Production):**
+   - `UseSandbox = true` 설정 시 샌드박스 주소(`https://sandbox-log-api.highbrow-inc.com/v1/collect`)로 자동 전송.
+   - `UseSandbox = false` (기본값) 설정 시 상용 라이브 주소(`https://log-api.highbrow-inc.com/v1/collect`)로 자동 전송.
+   - 복잡한 URL 입력 없이 불리언 플래그 하나로 완벽하게 스위칭됩니다.
+2. **Namespace 및 모듈 분리:**
    - 코어 및 진입점: `Highbrow.Core`
    - 로그 수집 모듈: `Highbrow.Log`
    - 광고 모듈 (확장 예정): `Highbrow.Ad`
    - 게임센터 모듈 (확장 예정): `Highbrow.GameCenter`
-2. **완벽한 디커플링 (Zero Coupling):**
-   - 각 서브 모듈은 독립된 Assembly Definition(`.asmdef`)으로 컴파일되며 상호 참조하지 않습니다. 로그 기능만 필요할 경우 광고/게임센터 모듈에 일절 영향을 받지 않습니다.
-3. **단일 진입점 (`HighbrowSDK.Initialize`):**
+3. **완벽한 디커플링 (Zero Coupling):**
+   - 각 서브 모듈은 독립된 Assembly Definition(`.asmdef`)으로 컴파일되며 상호 참조하지 않습니다.
+4. **단일 진입점 (`HighbrowSDK.Initialize`):**
    - `HighbrowSDK.Initialize(config)` 한 번으로 활성화된 모듈들이 일괄 초기화됩니다.
-4. **오프라인 큐 & 자동 재시도 (PlayerPrefs Retry Queue):**
+5. **오프라인 큐 & 자동 재시도 (PlayerPrefs Retry Queue):**
    - 네트워크 단절 또는 HTTP 오류 시 로그를 로컬 저장소(`PlayerPrefs`)에 FIFO 큐로 캐싱하며, 네트워크 정상화 시 백그라운드에서 자동 재전송합니다.
-5. **공통 메타데이터 자동 주입 (Auto-Injection):**
+6. **공통 메타데이터 자동 주입 (Auto-Injection):**
    - UTC 시각(`Time`), 기기 고유 ID(`Duid`), OS 종류(`Os`), 스토어 마켓(`Market`), 국가 코드(`Country`), 클라이언트 버전(`ClientVersion`), 기기 스펙(`DeviceInfo`)을 SDK 내부에서 자동 수집 및 주입합니다.
 
 ---
@@ -112,18 +118,7 @@
 ### 방법 1. Git URL로 설치 (권장)
 Unity Editor 상단 메뉴: **Window** > **Package Manager** > **`+` 버튼** > **Add package from git URL...**
 ```text
-https://github.com/highbrow-inc/HighbrowSDK-Partner.git?path=Packages/com.highbrow.sdk
-```
-
-### 방법 2. `manifest.json`에 직접 추가
-프로젝트의 `Packages/manifest.json` 파일의 `dependencies` 블록에 아래 내용을 추가합니다:
-```json
-{
-  "dependencies": {
-    "com.highbrow.sdk": "https://github.com/highbrow-inc/HighbrowSDK-Partner.git",
-    ...
-  }
-}
+https://github.com/HighbrowGame/HighbrowSDK-Partner.git
 ```
 
 ---
@@ -144,16 +139,15 @@ public class GameInitializer : MonoBehaviour
         HighbrowConfig config = new HighbrowConfig
         {
             AppKey = "YOUR_ISSUED_HIGHBROW_APP_KEY",   // 하이브로 발급 앱 키
-            ServerMode = "DEV",                          // DEV, QA, PROD 중 선택
+            UseSandbox = false,                         // true: 샌드박스 테스트, false: 상용 라이브 배포
             Region = "kr",                              // 서버 지역 코드 (kr, us, dev, qa 등)
-            LogEndpointUrl = "https://log-api.highbrow-inc.com/v1/collect",
             
             EnableLog = true,                           // 로그 모듈 활성화
             AutoSessionTracking = true,                 // 5분 주기 세션 하트비트 자동 활성화
             SessionIntervalSeconds = 300f,              // 세션 로그 주기 (기본 300초 = 5분)
             MaxOfflineQueueSize = 300,                  // 오프라인 캐시 최대 개수
             FlushRetryIntervalSeconds = 30f,            // 오프라인 큐 재전송 주기 (초)
-            DebugMode = true                            // 개발 단계에서 디버그 로그 활성화
+            DebugMode = false                           // 상용 배포 시 false 지정
         };
 
         HighbrowSDK.Initialize(config);
@@ -175,8 +169,6 @@ public class GameInitializer : MonoBehaviour
 ---
 
 ## 🛠 개별 AI 프롬프트 템플릿 (선택 사항)
-
-개별 파일 단위로 직접 AI에게 지시하고 싶을 때 사용하는 템플릿입니다.
 
 <details>
 <summary><b>1. 로그인/인증 연동 템플릿 (Click to expand)</b></summary>

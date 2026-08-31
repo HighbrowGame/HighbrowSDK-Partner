@@ -378,7 +378,7 @@ namespace Highbrow.Log
                 return;
             }
 
-            string endpoint = config?.LogEndpointUrl;
+            string endpoint = config?.GetResolvedLogEndpointUrl();
             string appKey = config?.AppKey;
 
             httpClient.PostJson(endpoint, appKey, logType, jsonPayload, (success, response) =>
@@ -436,7 +436,7 @@ namespace Highbrow.Log
                 bool isDone = false;
                 bool isSuccess = false;
 
-                httpClient.PostJson(config?.LogEndpointUrl, config?.AppKey, item.LogType, item.JsonPayload, (success, res) =>
+                httpClient.PostJson(config?.GetResolvedLogEndpointUrl(), config?.AppKey, item.LogType, item.JsonPayload, (success, res) =>
                 {
                     isSuccess = success;
                     isDone = true;

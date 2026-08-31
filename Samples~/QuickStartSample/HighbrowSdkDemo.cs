@@ -13,16 +13,16 @@ namespace Highbrow.Samples
     {
         [Header("SDK Settings")]
         [SerializeField] private string appKey = "SAMPLE_HIGHBROW_APP_KEY";
-        [SerializeField] private string serverMode = "DEV";
+        [SerializeField] private bool useSandbox = true; // true: Sandbox/DEV, false: Production
         [SerializeField] private string region = "kr";
 
         private void Start()
         {
-            // 1. Initialize Highbrow SDK
+            // 1. Initialize Highbrow SDK (2-tier automatic routing: Sandbox vs Production)
             HighbrowConfig config = new HighbrowConfig
             {
                 AppKey = appKey,
-                ServerMode = serverMode,
+                UseSandbox = useSandbox, // Set false for live release
                 Region = region,
                 EnableLog = true,
                 AutoSessionTracking = true,
@@ -32,7 +32,7 @@ namespace Highbrow.Samples
 
             HighbrowSDK.Initialize(config);
 
-            Debug.Log("[HighbrowSdkDemo] Highbrow SDK Initialized successfully.");
+            Debug.Log($"[HighbrowSdkDemo] Highbrow SDK Initialized (Endpoint: {config.GetResolvedLogEndpointUrl()})");
         }
 
         // Example: Called when user logs in via Google/Apple/Guest

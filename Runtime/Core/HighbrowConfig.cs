@@ -4,31 +4,47 @@ namespace Highbrow.Core
 {
     /// <summary>
     /// Global configuration container for Highbrow SDK.
+    /// Provides 2-tier automatic endpoint routing (Sandbox vs Production).
     /// </summary>
     [Serializable]
     public class HighbrowConfig
     {
+        public const string DefaultProductionEndpoint = "https://log-api.highbrow-inc.com/v1/collect";
+        public const string DefaultSandboxEndpoint = "https://sandbox-log-api.highbrow-inc.com/v1/collect";
+
         /// <summary>
         /// Issued Application Key / Project Key for authentication.
         /// </summary>
         public string AppKey = string.Empty;
 
         /// <summary>
-        /// Server execution environment mode (DEV, QA, PROD).
-        /// Default is "DEV".
+        /// When true, routes logs to the Sandbox/Testing collector (DEV mode).
+        /// When false (default), routes logs to the live Production collector (PROD mode).
         /// </summary>
-        public string ServerMode = "DEV";
+        public bool UseSandbox = false;
 
         /// <summary>
         /// Server region code (e.g. "kr", "us", "eu", "dev", "qa", "liveqa").
-        /// Default is "dev".
+        /// Default is "kr".
         /// </summary>
-        public string Region = "dev";
+        public string Region = "kr";
 
         /// <summary>
-        /// Base URL / endpoint for Highbrow log collector backend.
+        /// Optional custom collector URL override.
+        /// If not set, automatically resolves to Sandbox or Production URL based on UseSandbox.
         /// </summary>
-        public string LogEndpointUrl = "https://log-api.highbrow-inc.com/v1/collect";
+        public string CustomLogEndpointUrl = null;
+
+        /// <summary>
+        /// Server mode string representation ("DEV" when UseSandbox is true, "PROD" otherwise).
+        /// </summary>
+        public string ServerMode
+        {
+            get => UseSandbox ? "DEV" : "PROD";
+            set => UseSandbox = string.Equals(value, "DEV", StringComparison.OrdinalIgnoreCase) ||
+                               string.Equals(value, "SANDBOX", StringComparison.OrdinalIgnoreCase) ||
+                               string.Equals(value, "QA", StringComparison.OrdinalIgnoreCase);
+        }
 
         /// <summary>
         /// Enable or disable the Log module upon SDK initialization.
@@ -91,12 +107,25 @@ namespace Highbrow.Core
         /// </summary>
         public string CustomClientVersion = null;
 
+        /// <summary>
+        /// Resolves active log collector endpoint URL based on UseSandbox and CustomLogEndpointUrl.
+        /// </summary>
+        public string GetResolvedLogEndpointUrl()
+        {
+            if (!string.IsNullOrEmpty(CustomLogEndpointUrl))
+            {
+                return CustomLogEndpointUrl;
+            }
+
+            return UseSandbox ? DefaultSandboxEndpoint : DefaultProductionEndpoint;
+        }
+
         public HighbrowConfig() { }
 
-        public HighbrowConfig(string appKey, string serverMode = "DEV", string region = "dev")
+        public HighbrowConfig(string appKey, bool useSandbox = false, string region = "kr")
         {
             AppKey = appKey;
-            ServerMode = serverMode;
+            UseSandbox = useSandbox;
             Region = region;
         }
     }

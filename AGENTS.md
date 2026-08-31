@@ -19,7 +19,7 @@ This guide instructs AI coding agents (Cursor, Copilot, Claude, Windsurf, etc.) 
 
 ---
 
-## 2. SDK Initialization
+## 2. SDK Initialization (2-Tier Routing: Sandbox vs Production)
 
 Initialize once in the game's startup bootstrap/splash script (e.g. `GameInitializer.cs` or `TitleManager.cs`):
 
@@ -30,12 +30,12 @@ using Highbrow.Log;
 HighbrowConfig config = new HighbrowConfig
 {
     AppKey = "PARTNER_APP_KEY",         // Issued by Highbrow
-    ServerMode = "DEV",                 // "DEV", "QA", "PROD"
+    UseSandbox = false,                 // true: Sandbox/DEV collector, false: Production collector
     Region = "kr",                     // "kr", "us", "dev", "qa", etc.
     EnableLog = true,
     AutoSessionTracking = true,        // Automatically sends 5-min heartbeat
     SessionIntervalSeconds = 300f,
-    DebugMode = true                   // Set false in production
+    DebugMode = false                  // Set false in production
 };
 
 HighbrowSDK.Initialize(config);

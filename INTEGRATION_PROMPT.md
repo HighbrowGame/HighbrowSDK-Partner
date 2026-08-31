@@ -22,9 +22,11 @@
 
 프로젝트 환경과 여건에 맞게 안전하게 연동하기 위해 다음 질문에 답변해 주세요:
 
-### 1. SDK 기본 정보
+### 1. SDK 기본 정보 및 환경 모드
 - 하이브로 발급 **AppKey**: (예: `YOUR_APP_KEY`)
-- 타겟 환경: `DEV` / `QA` / `PROD` 중 선택 (기본: `DEV`)
+- 테스트/배포 모드:
+  - [ ] **(A) 개발/테스트 모드:** `UseSandbox = true` (샌드박스 수집 서버로 자동 전송)
+  - [ ] **(B) 라이브 상용 배포:** `UseSandbox = false` (Production 수집 서버로 자동 전송)
 - 서버 리전: `kr` / `us` / `dev` / `qa` 등 (기본: `kr`)
 
 ### 2. 유저 식별자 (SUID) 및 로그인
@@ -59,7 +61,7 @@
 
 - **사전 질문 응답을 받기 전까지는 절대 프로젝트 파일을 수정하지 마세요.**
 - 개발자가 질문에 답변하면, 답변을 분석하여:
-  1. SDK 초기화 코드 (`HighbrowSDK.Initialize(...)`) 구성
+  1. SDK 초기화 코드 (`HighbrowSDK.Initialize(...)`) 구성 (UseSandbox 설정 포함)
   2. 수정 대상 파일 및 삽입 위치 목록
   3. `TrackAuth`, `TrackNewUser`(조건부), `TrackPurchase`, `TrackAd`(조건부), `SessionTracking` 적용 계획
   을 작성해 보여주고, **"이 계획대로 연동을 진행할까요? (Yes / 수정 요청)"**을 물어보세요.

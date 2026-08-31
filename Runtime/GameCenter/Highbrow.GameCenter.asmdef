@@ -1,0 +1,16 @@
+{
+    "name": "Highbrow.GameCenter",
+    "rootNamespace": "Highbrow.GameCenter",
+    "references": [
+        "Highbrow.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

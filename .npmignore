@@ -1,0 +1,9 @@
+.agent/
+.git/
+.gitignore
+.npmignore
+.idea/
+.vs/
+*.csproj
+*.sln
+Tests/

@@ -1,0 +1,16 @@
+{
+    "name": "Highbrow.Log",
+    "rootNamespace": "Highbrow.Log",
+    "references": [
+        "Highbrow.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

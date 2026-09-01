@@ -14,8 +14,7 @@ namespace Highbrow.Log
         public int Market;
         public int Os;
         public string Country;
-        public string PurchaseTime;
         public int ProductId;
-        public string Region;
+        public string PurchaseTime;
     }
 }

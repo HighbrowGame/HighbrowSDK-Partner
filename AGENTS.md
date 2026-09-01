@@ -15,7 +15,6 @@ This guide instructs AI coding agents (Cursor, Copilot, Claude, Windsurf, etc.) 
    - Insert only the required `HighbrowLog.Track...()` or `HighbrowAd.Show(...)` calls at the exact completion/success points.
 3. **Decoupled Modules:**
    - The Log module does NOT depend on Ad. Use `HighbrowLog` directly.
-   - `HighbrowAdPlayer` automatically logs `TrackAd` events when played.
 
 ---
 
@@ -91,13 +90,9 @@ HighbrowSDK.Initialize(config);
 
 ### 4) Advertisements (`TrackAd`)
 - **Call Location:** In the ad mediation callbacks (AppLovin MAX, IronSource, AdMob, etc.).
-- **Impression Start:**
+- **Signature:**
   ```csharp
-  HighbrowLog.TrackAd(AdType.RewardVideo, isComplete: false);
-  ```
-- **Impression Complete (Rewarded):**
-  ```csharp
-  HighbrowLog.TrackAd(AdType.RewardVideo, isComplete: true, userAdSkipPackage: hasNoAdsPass);
+  HighbrowLog.TrackAd(AdType.RewardVideo);
   ```
 - **AdType Enum:** `AdType.RewardVideo`, `AdType.Interstitial`, `AdType.Banner`, `AdType.CrossPromotion`.
 
@@ -116,7 +111,10 @@ HighbrowSDK.Initialize(config);
       }
   );
   ```
-- **Prefab / Resources:** Loads `UI_HighbrowAd` directly from Resources (no Addressables needed). Automatically logs `TrackAd(AdType.CrossPromotion)`.
+
+### 6) Daily Active User (DAU) Tracking
+- **DAU SUID:** `HighbrowLog.TrackDailyActiveUserSuid(lastActiveTime, userCreateTime);`
+- **DAU DUID:** `HighbrowLog.TrackDailyActiveUserDuid(userCreateTime, isNewDuid);`
 
 ---
 

@@ -14,7 +14,6 @@ namespace Highbrow.Samples
         [Header("SDK Settings")]
         [SerializeField] private string appKey = "SAMPLE_HIGHBROW_APP_KEY";
         [SerializeField] private bool useSandbox = true; // true: Sandbox/DEV, false: Production
-        [SerializeField] private string region = "kr";
 
         private void Start()
         {
@@ -23,7 +22,6 @@ namespace Highbrow.Samples
             {
                 AppKey = appKey,
                 UseSandbox = useSandbox, // Set false for live release
-                Region = region,
                 EnableLog = true,
                 AutoSessionTracking = true,
                 SessionIntervalSeconds = 300f, // 5 minutes
@@ -32,7 +30,7 @@ namespace Highbrow.Samples
 
             HighbrowSDK.Initialize(config);
 
-            Debug.Log($"[HighbrowSdkDemo] Highbrow SDK Initialized (Endpoint: {config.GetResolvedLogEndpointUrl()})");
+            Debug.Log($"[HighbrowSdkDemo] Highbrow SDK Initialized (BaseUrl: {config.GetResolvedBaseUrl()})");
         }
 
         // Example: Called when user logs in via Google/Apple/Guest
@@ -71,30 +69,18 @@ namespace Highbrow.Samples
         }
 
         // Example: Called when Ad is viewed
-        public void OnAdViewed(AdType adType, bool isCompleted, bool hasSkipPackage)
+        public void OnAdViewed(AdType adType)
         {
             // 4. Track Ad View Log
-            HighbrowLog.TrackAd(
-                adType: adType,
-                isComplete: isCompleted,
-                userAdSkipPackage: hasSkipPackage
-            );
+            HighbrowLog.TrackAd(adType);
         }
 
-        // Example: Called to show Highbrow In-house Cross Promotion Ad
-        public void ShowCrossPromotionAd()
+        // Example: Called on date change for DAU metrics
+        public void OnDailyCheck(DateTime lastActiveTime, DateTime? userCreateTime)
         {
-            // 5. Show In-house House Ad
-            Highbrow.Ad.HighbrowAd.Show(
-                onCompleted: () =>
-                {
-                    Debug.Log("[HighbrowSdkDemo] Cross-promotion ad finished. Grant reward here.");
-                },
-                onFailed: () =>
-                {
-                    Debug.LogWarning("[HighbrowSdkDemo] Failed to load or display cross-promotion ad.");
-                }
-            );
+            // 5. Track Daily Active User (DAU)
+            HighbrowLog.TrackDailyActiveUserSuid(lastActiveTime, userCreateTime);
+            HighbrowLog.TrackDailyActiveUserDuid(userCreateTime);
         }
     }
 }

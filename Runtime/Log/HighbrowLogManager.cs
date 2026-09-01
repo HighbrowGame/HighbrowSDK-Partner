@@ -21,6 +21,8 @@ namespace Highbrow.Log
         public const string PathLogStoreReceipt = "/v1/log/purchase";
         public const string PathLogNewPaying = "/v1/log/new-paying";
         public const string PathLogAd = "/v1/log/ad";
+        public const string PathLogDauSuid = "/v1/log/dau-suid";
+        public const string PathLogDauDuid = "/v1/log/dau-duid";
 
         private const string PrefsFirstLaunchKey = "HIGHBROW_SDK_FIRST_LAUNCH_FLAG";
         private static HighbrowLogManager instance;
@@ -169,21 +171,17 @@ namespace Highbrow.Log
             AuthLog log = new AuthLog
             {
                 Time = HighbrowContext.GetUtcNowIsoString(),
+                AccountType = (int)accountType,
+                AccountId = accountId ?? string.Empty,
                 Suid = ResolveSuid(suid),
-                Nickname = nickname ?? string.Empty,
                 Duid = HighbrowContext.GetDuid(config?.CustomDuid),
                 Market = HighbrowContext.GetMarketType(config?.CustomMarket),
                 Os = HighbrowContext.GetOsType(),
                 Country = HighbrowContext.GetCountry(config?.CustomCountry),
                 IpAddress = ipAddress ?? string.Empty,
-                AccountType = (int)accountType,
-                AccountId = accountId ?? string.Empty,
-                Result = result ?? "OK",
+                Nickname = nickname ?? string.Empty,
                 DeviceInfo = HighbrowContext.GetDeviceInfo(),
-                ClientVersion = HighbrowContext.GetClientVersion(config?.CustomClientVersion),
-                LastActiveTime = HighbrowContext.FormatUtcIsoString(lastActiveTimeUtc),
-                IsNewDuid = isNewDuidCached,
-                Region = ResolveRegion()
+                Result = result ?? "OK"
             };
 
             lastActiveTimeUtc = DateTime.UtcNow;
@@ -203,14 +201,13 @@ namespace Highbrow.Log
             NewUserLog log = new NewUserLog
             {
                 Time = HighbrowContext.GetUtcNowIsoString(),
+                AccountType = (int)targetAccountType,
                 Suid = targetSuid,
                 Duid = HighbrowContext.GetDuid(config?.CustomDuid),
                 Market = HighbrowContext.GetMarketType(config?.CustomMarket),
                 Os = HighbrowContext.GetOsType(),
                 Country = HighbrowContext.GetCountry(config?.CustomCountry),
-                AccountType = (int)targetAccountType,
-                IsNewDuid = isNewDuidCached,
-                Region = ResolveRegion()
+                IsNewDuid = isNewDuidCached
             };
 
             SendLog(PathLogNewUser, "LogNewUser", JsonUtility.ToJson(log));
@@ -247,8 +244,7 @@ namespace Highbrow.Log
                 ProductName = productName ?? string.Empty,
                 PurchaseTime = HighbrowContext.FormatUtcIsoString(pTime),
                 ClientVersion = HighbrowContext.GetClientVersion(config?.CustomClientVersion),
-                DeviceInfo = HighbrowContext.GetDeviceInfo(),
-                Region = ResolveRegion()
+                DeviceInfo = HighbrowContext.GetDeviceInfo()
             };
 
             SendLog(PathLogStoreReceipt, "LogStoreReceipt", JsonUtility.ToJson(log));
@@ -273,23 +269,22 @@ namespace Highbrow.Log
                 Market = HighbrowContext.GetMarketType(config?.CustomMarket),
                 Os = HighbrowContext.GetOsType(),
                 Country = HighbrowContext.GetCountry(config?.CustomCountry),
-                PurchaseTime = HighbrowContext.FormatUtcIsoString(pTime),
                 ProductId = productId,
-                Region = ResolveRegion()
+                PurchaseTime = HighbrowContext.FormatUtcIsoString(pTime)
             };
 
             SendLog(PathLogNewPaying, "LogNewPaying", JsonUtility.ToJson(log));
         }
 
         /// <summary>
-        /// Tracks advertisement view lifecycle (impression start or completion).
+        /// Tracks advertisement view lifecycle.
         /// </summary>
         /// <param name="adType">Ad placement format type.</param>
-        /// <param name="isComplete">True for completed view (reward eligible), False for view start.</param>
-        /// <param name="userAdSkipPackage">Whether user active ad-skip subscription is used.</param>
+        /// <param name="isComplete">Optional completion status (preserved for backwards compatibility).</param>
+        /// <param name="userAdSkipPackage">Optional ad-skip package flag (preserved for backwards compatibility).</param>
         /// <param name="customAdTypeName">Optional string representation override of AdType.</param>
         /// <param name="suid">Optional SUID override.</param>
-        public void TrackAd(AdType adType, bool isComplete, bool userAdSkipPackage = false, string customAdTypeName = null, string suid = null)
+        public void TrackAd(AdType adType, bool isComplete = true, bool userAdSkipPackage = false, string customAdTypeName = null, string suid = null)
         {
             string adTypeName = !string.IsNullOrEmpty(customAdTypeName) ? customAdTypeName : adType.ToString();
 
@@ -297,18 +292,57 @@ namespace Highbrow.Log
             {
                 Time = HighbrowContext.GetUtcNowIsoString(),
                 Suid = ResolveSuid(suid),
-                Duid = HighbrowContext.GetDuid(config?.CustomDuid),
                 Market = HighbrowContext.GetMarketType(config?.CustomMarket),
                 Os = HighbrowContext.GetOsType(),
                 Country = HighbrowContext.GetCountry(config?.CustomCountry),
                 AdType = (int)adType,
-                AdTypeName = adTypeName,
-                IsComplete = isComplete,
-                UserAdSkipPackage = userAdSkipPackage,
-                Region = ResolveRegion()
+                AdTypeName = adTypeName
             };
 
             SendLog(PathLogAd, "LogAd", JsonUtility.ToJson(log));
+        }
+
+        /// <summary>
+        /// Tracks daily active unique user (DAU SUID) log recorded on daily date transition or market change.
+        /// </summary>
+        public void TrackDailyActiveUserSuid(DateTime lastActiveTime, DateTime? userCreateTime = null, string suid = null)
+        {
+            DateTime createTime = userCreateTime ?? userCreateTimeUtc ?? DateTime.UtcNow;
+
+            DailyActiveUserSuidLog log = new DailyActiveUserSuidLog
+            {
+                Time = HighbrowContext.GetUtcNowIsoString(),
+                Suid = ResolveSuid(suid),
+                Market = HighbrowContext.GetMarketType(config?.CustomMarket),
+                Os = HighbrowContext.GetOsType(),
+                Country = HighbrowContext.GetCountry(config?.CustomCountry),
+                LastActiveTime = HighbrowContext.FormatUtcIsoString(lastActiveTime),
+                UserCreateTime = HighbrowContext.FormatUtcIsoString(createTime)
+            };
+
+            SendLog(PathLogDauSuid, "LogDailyActiveUserSuid", JsonUtility.ToJson(log));
+        }
+
+        /// <summary>
+        /// Tracks daily active unique device (DAU DUID) log recorded on daily date transition.
+        /// </summary>
+        public void TrackDailyActiveUserDuid(DateTime? userCreateTime = null, bool? isNewDuid = null, string duid = null)
+        {
+            DateTime createTime = userCreateTime ?? userCreateTimeUtc ?? DateTime.UtcNow;
+            bool isNew = isNewDuid ?? isNewDuidCached;
+
+            DailyActiveUserDuidLog log = new DailyActiveUserDuidLog
+            {
+                Time = HighbrowContext.GetUtcNowIsoString(),
+                Duid = !string.IsNullOrEmpty(duid) ? duid : HighbrowContext.GetDuid(config?.CustomDuid),
+                Market = HighbrowContext.GetMarketType(config?.CustomMarket),
+                Os = HighbrowContext.GetOsType(),
+                Country = HighbrowContext.GetCountry(config?.CustomCountry),
+                UserCreateTime = HighbrowContext.FormatUtcIsoString(createTime),
+                IsNewDuid = isNew
+            };
+
+            SendLog(PathLogDauDuid, "LogDailyActiveUserDuid", JsonUtility.ToJson(log));
         }
 
         #endregion
@@ -365,8 +399,7 @@ namespace Highbrow.Log
                 Market = HighbrowContext.GetMarketType(config?.CustomMarket),
                 Os = HighbrowContext.GetOsType(),
                 Country = HighbrowContext.GetCountry(config?.CustomCountry),
-                UserCreateTime = HighbrowContext.FormatUtcIsoString(createTime),
-                Region = ResolveRegion()
+                UserCreateTime = HighbrowContext.FormatUtcIsoString(createTime)
             };
 
             SendLog(PathLogAlive, "LogAlive", JsonUtility.ToJson(log));
@@ -505,7 +538,12 @@ namespace Highbrow.Log
                 case "LogNewPaying":
                     return config?.GetEndpointUrl(PathLogNewPaying);
                 case "LogAd":
+                case "LogAdvertisement":
                     return config?.GetEndpointUrl(PathLogAd);
+                case "LogDailyActiveUserSuid":
+                    return config?.GetEndpointUrl(PathLogDauSuid);
+                case "LogDailyActiveUserDuid":
+                    return config?.GetEndpointUrl(PathLogDauDuid);
                 default:
                     return config?.GetResolvedLogEndpointUrl();
             }
@@ -529,6 +567,10 @@ namespace Highbrow.Log
                     return "LogNewPaying";
                 case PathLogAd:
                     return "LogAd";
+                case PathLogDauSuid:
+                    return "LogDailyActiveUserSuid";
+                case PathLogDauDuid:
+                    return "LogDailyActiveUserDuid";
                 default:
                     return logTypeOrPath;
             }
@@ -545,11 +587,6 @@ namespace Highbrow.Log
                 return explicitSuid;
             }
             return !string.IsNullOrEmpty(currentSuid) ? currentSuid : string.Empty;
-        }
-
-        private string ResolveRegion()
-        {
-            return !string.IsNullOrEmpty(config?.Region) ? config.Region : "dev";
         }
 
         private void HandlePauseStateChanged(bool isPaused)

@@ -3,19 +3,18 @@ using System;
 namespace Highbrow.Log
 {
     /// <summary>
-    /// User session heartbeat log recorded periodically (every 5 minutes) while active.
-    /// JSON Keys match Snowflake USER_SESSION log schema.
+    /// Daily active unique user log recorded on daily date transition or market change.
+    /// JSON Keys match Snowflake DAILY_ACTIVE_USER_SUID log schema.
     /// </summary>
     [Serializable]
-    public class UserSessionLog
+    public class DailyActiveUserSuidLog
     {
         public string Time;
-        public int AccountType;
         public string Suid;
-        public string Duid;
         public int Market;
         public int Os;
         public string Country;
+        public string LastActiveTime;
         public string UserCreateTime;
     }
 }

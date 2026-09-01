@@ -10,7 +10,7 @@ For the full AI agent guide, see [AGENTS.md](file:///Volumes/ExtDisk01/Projects/
 ## Key Namespaces
 - `using Highbrow.Core;` (SDK initialization, config, context)
 - `using Highbrow.Log;` (Log APIs, Enums, Models)
-- `using Highbrow.Ad;` (In-house cross-promotion house ad player)
+- `using Highbrow.Ad;` (In-house cross promotion ads)
 
 ## Essential API Patterns
 
@@ -20,7 +20,6 @@ HighbrowSDK.Initialize(new HighbrowConfig
 {
     AppKey = "YOUR_APP_KEY",
     UseSandbox = false, // true for dev/test, false for production
-    Region = "kr",
     EnableLog = true,
     AutoSessionTracking = true
 });
@@ -38,14 +37,19 @@ HighbrowLog.TrackAuth(suid, accountId, AccountType.GooglePlay, nickname);
 HighbrowLog.TrackPurchase(receiptId, price, priceId, productId, productName, isFirstPurchase: false);
 ```
 
-### 4. Track Ad
+### 4. Track Ad & Show Highbrow House Ads
 ```csharp
-HighbrowLog.TrackAd(AdType.RewardVideo, isComplete: true, userAdSkipPackage: false);
+// Third-party ad impression
+HighbrowLog.TrackAd(AdType.RewardVideo);
+
+// Highbrow in-house house ad
+HighbrowAd.Show(onCompleted: () => { /* reward */ });
 ```
 
-### 5. Show In-House Cross Promotion Ad
+### 5. Track DAU (Daily Active User)
 ```csharp
-HighbrowAd.Show(onCompleted: () => { /* grant reward or resume */ });
+HighbrowLog.TrackDailyActiveUserSuid(lastActiveTime, userCreateTime);
+HighbrowLog.TrackDailyActiveUserDuid(userCreateTime, isNewDuid);
 ```
 
 ## Partner Limitations Guardrails

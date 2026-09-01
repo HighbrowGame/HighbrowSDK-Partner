@@ -78,9 +78,25 @@ namespace Highbrow.Log
         /// <summary>
         /// Tracks advertisement view lifecycle.
         /// </summary>
-        public static void TrackAd(AdType adType, bool isComplete, bool userAdSkipPackage = false, string customAdTypeName = null, string suid = null)
+        public static void TrackAd(AdType adType, bool isComplete = true, bool userAdSkipPackage = false, string customAdTypeName = null, string suid = null)
         {
             Manager.TrackAd(adType, isComplete, userAdSkipPackage, customAdTypeName, suid);
+        }
+
+        /// <summary>
+        /// Tracks daily active unique user (DAU SUID) log recorded on daily date transition or market change.
+        /// </summary>
+        public static void TrackDailyActiveUserSuid(DateTime lastActiveTime, DateTime? userCreateTime = null, string suid = null)
+        {
+            Manager.TrackDailyActiveUserSuid(lastActiveTime, userCreateTime, suid);
+        }
+
+        /// <summary>
+        /// Tracks daily active unique device (DAU DUID) log recorded on daily date transition.
+        /// </summary>
+        public static void TrackDailyActiveUserDuid(DateTime? userCreateTime = null, bool? isNewDuid = null, string duid = null)
+        {
+            Manager.TrackDailyActiveUserDuid(userCreateTime, isNewDuid, duid);
         }
 
         /// <summary>

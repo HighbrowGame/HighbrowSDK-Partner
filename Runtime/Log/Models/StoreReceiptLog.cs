@@ -22,6 +22,5 @@ namespace Highbrow.Log
         public string PurchaseTime;
         public string ClientVersion;
         public string DeviceInfo;
-        public string Region;
     }
 }

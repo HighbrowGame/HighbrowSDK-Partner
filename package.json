@@ -1,10 +1,15 @@
 {
   "name": "com.highbrow.sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "displayName": "Highbrow SDK",
   "description": "Integrated client SDK for Highbrow publishing partners. Provides real-time log collection and in-house cross-promotion ad players with clean modular architecture.",
   "unity": "2020.3",
   "unityRelease": "0f1",
+  "dependencies": {
+    "com.unity.modules.video": "1.0.0",
+    "com.unity.modules.ui": "1.0.0",
+    "com.unity.modules.unitywebrequest": "1.0.0"
+  },
   "author": {
     "name": "Highbrow Inc.",
     "email": "dev@highbrow-inc.com",

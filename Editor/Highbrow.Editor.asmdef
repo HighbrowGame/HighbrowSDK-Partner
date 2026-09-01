@@ -3,7 +3,8 @@
     "rootNamespace": "Highbrow.Editor",
     "references": [
         "Highbrow.Core",
-        "Highbrow.Log"
+        "Highbrow.Log",
+        "Highbrow.Ad"
     ],
     "includePlatforms": [
         "Editor"

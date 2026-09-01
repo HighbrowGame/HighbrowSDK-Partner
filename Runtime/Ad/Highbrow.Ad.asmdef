@@ -2,7 +2,9 @@
     "name": "Highbrow.Ad",
     "rootNamespace": "Highbrow.Ad",
     "references": [
-        "Highbrow.Core"
+        "Highbrow.Core",
+        "Highbrow.Log",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

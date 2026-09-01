@@ -10,6 +10,7 @@ For the full AI agent guide, see [AGENTS.md](file:///Volumes/ExtDisk01/Projects/
 ## Key Namespaces
 - `using Highbrow.Core;` (SDK initialization, config, context)
 - `using Highbrow.Log;` (Log APIs, Enums, Models)
+- `using Highbrow.Ad;` (In-house cross-promotion house ad player)
 
 ## Essential API Patterns
 
@@ -40,6 +41,11 @@ HighbrowLog.TrackPurchase(receiptId, price, priceId, productId, productName, isF
 ### 4. Track Ad
 ```csharp
 HighbrowLog.TrackAd(AdType.RewardVideo, isComplete: true, userAdSkipPackage: false);
+```
+
+### 5. Show In-House Cross Promotion Ad
+```csharp
+HighbrowAd.Show(onCompleted: () => { /* grant reward or resume */ });
 ```
 
 ## Partner Limitations Guardrails

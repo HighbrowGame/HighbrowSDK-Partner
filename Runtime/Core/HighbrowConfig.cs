@@ -54,12 +54,7 @@ namespace Highbrow.Core
         /// <summary>
         /// Enable or disable the Ad module upon SDK initialization.
         /// </summary>
-        public bool EnableAd = false;
-
-        /// <summary>
-        /// Enable or disable the GameCenter module upon SDK initialization.
-        /// </summary>
-        public bool EnableGameCenter = false;
+        public bool EnableAd = true;
 
         /// <summary>
         /// Whether to automatically start 5-minute alive/session tracking when Log module is initialized.

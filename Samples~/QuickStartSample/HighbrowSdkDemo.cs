@@ -80,5 +80,21 @@ namespace Highbrow.Samples
                 userAdSkipPackage: hasSkipPackage
             );
         }
+
+        // Example: Called to show Highbrow In-house Cross Promotion Ad
+        public void ShowCrossPromotionAd()
+        {
+            // 5. Show In-house House Ad
+            Highbrow.Ad.HighbrowAd.Show(
+                onCompleted: () =>
+                {
+                    Debug.Log("[HighbrowSdkDemo] Cross-promotion ad finished. Grant reward here.");
+                },
+                onFailed: () =>
+                {
+                    Debug.LogWarning("[HighbrowSdkDemo] Failed to load or display cross-promotion ad.");
+                }
+            );
+        }
     }
 }

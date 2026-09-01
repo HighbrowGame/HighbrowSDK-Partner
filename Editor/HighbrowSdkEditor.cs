@@ -1,5 +1,4 @@
 using Highbrow.Core;
-using Highbrow.Log;
 using UnityEditor;
 using UnityEngine;
 
@@ -20,7 +19,22 @@ namespace Highbrow.Editor
             Debug.Log("[HighbrowSDK Editor] Offline log cache and device identifiers cleared from PlayerPrefs.");
         }
 
-        [MenuItem("Highbrow/Show Current SDK Status", false, 11)]
+        [MenuItem("Highbrow/Select HighbrowGamesInfo Asset", false, 20)]
+        public static void SelectGamesInfoAsset()
+        {
+            var asset = Resources.Load<HighbrowGamesInfo>("Highbrow/HighbrowGamesInfo");
+            if (asset != null)
+            {
+                Selection.activeObject = asset;
+                EditorGUIUtility.PingObject(asset);
+            }
+            else
+            {
+                Debug.LogWarning("[HighbrowSDK Editor] HighbrowGamesInfo asset not found in Resources/Highbrow.");
+            }
+        }
+
+        [MenuItem("Highbrow/Show Current SDK Status", false, 30)]
         public static void ShowSdkStatus()
         {
             string status = HighbrowSDK.IsInitialized ? "Initialized" : "Not Initialized";

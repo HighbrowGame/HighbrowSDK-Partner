@@ -9,13 +9,13 @@ This guide instructs AI coding agents (Cursor, Copilot, Claude, Windsurf, etc.) 
 1. **Namespaces:**
    - Core SDK: `using Highbrow.Core;`
    - Log Module: `using Highbrow.Log;`
-   - Ad Module (Skeleton): `using Highbrow.Ad;`
-   - GameCenter Module (Skeleton): `using Highbrow.GameCenter;`
+   - Ad Module: `using Highbrow.Ad;`
 2. **Surgical Edits Only:**
    - Do NOT refactor or rewrite the partner's existing game logic, login handlers, IAP flows, or ad callbacks.
-   - Insert only the required `HighbrowLog.Track...()` calls at the exact completion/success points.
+   - Insert only the required `HighbrowLog.Track...()` or `HighbrowAd.Show(...)` calls at the exact completion/success points.
 3. **Decoupled Modules:**
-   - The Log module does NOT depend on Ad or GameCenter. Use `HighbrowLog` directly.
+   - The Log module does NOT depend on Ad. Use `HighbrowLog` directly.
+   - `HighbrowAdPlayer` automatically logs `TrackAd` events when played.
 
 ---
 
@@ -100,6 +100,23 @@ HighbrowSDK.Initialize(config);
   HighbrowLog.TrackAd(AdType.RewardVideo, isComplete: true, userAdSkipPackage: hasNoAdsPass);
   ```
 - **AdType Enum:** `AdType.RewardVideo`, `AdType.Interstitial`, `AdType.Banner`, `AdType.CrossPromotion`.
+
+### 5) In-House Cross Promotion Ads (`HighbrowAd`)
+- **Call Location:** When showing Highbrow house ads (e.g. mediation no-fill fallback, cross-promotion button).
+- **One-Line Display:**
+  ```csharp
+  using Highbrow.Ad;
+
+  HighbrowAd.Show(
+      onCompleted: () => {
+          // Grant reward or resume game
+      },
+      onFailed: () => {
+          // Fallback handling
+      }
+  );
+  ```
+- **Prefab / Resources:** Loads `UI_HighbrowAd` directly from Resources (no Addressables needed). Automatically logs `TrackAd(AdType.CrossPromotion)`.
 
 ---
 

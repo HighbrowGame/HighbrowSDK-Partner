@@ -2,7 +2,7 @@
   "name": "com.highbrow.sdk",
   "version": "1.0.0",
   "displayName": "Highbrow SDK",
-  "description": "Integrated client SDK for Highbrow publishing partners. Provides log collection, cross-promotion ad players, and game center integration with decoupled modular architecture.",
+  "description": "Integrated client SDK for Highbrow publishing partners. Provides real-time log collection and in-house cross-promotion ad players with clean modular architecture.",
   "unity": "2020.3",
   "unityRelease": "0f1",
   "author": {
@@ -17,7 +17,6 @@
     "log",
     "snowflake",
     "cross-promotion",
-    "ads",
-    "gamecenter"
+    "ads"
   ]
 }

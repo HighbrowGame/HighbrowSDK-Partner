@@ -113,9 +113,9 @@
 ## 🏛 특징 및 아키텍처 원칙
 
 1. **2단계 자동 엔드포인트 라우팅 (Sandbox vs Production):**
-   - `UseSandbox = true` 설정 시 샌드박스 주소(`https://sandbox-log-api.highbrow-inc.com/v1/collect`)로 자동 전송.
-   - `UseSandbox = false` (기본값) 설정 시 상용 라이브 주소(`https://log-api.highbrow-inc.com/v1/collect`)로 자동 전송.
-   - 복잡한 URL 입력 없이 불리언 플래그 하나로 완벽하게 스위칭됩니다.
+   - `UseSandbox = true` 설정 시 샌드박스 Base URL(`https://sandbox-log-api.highbrow-inc.com`)로 자동 라우팅.
+   - `UseSandbox = false` (기본값) 설정 시 상용 라이브 Base URL(`https://log-api.highbrow-inc.com`)로 자동 라우팅.
+   - 각 로그 유형별 RESTful 엔드포인트(`/v1/log/auth`, `/v1/log/purchase` 등)로 명확히 분기되어 전송됩니다.
 2. **Namespace 및 모듈 분리:**
    - 코어 및 진입점: `Highbrow.Core`
    - 로그 수집 모듈: `Highbrow.Log`

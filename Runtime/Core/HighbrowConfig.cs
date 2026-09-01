@@ -9,6 +9,10 @@ namespace Highbrow.Core
     [Serializable]
     public class HighbrowConfig
     {
+        public const string DefaultProductionBaseUrl = "https://log-api.highbrow-inc.com";
+        public const string DefaultSandboxBaseUrl = "https://sandbox-log-api.highbrow-inc.com";
+
+        // Legacy compatibility constants
         public const string DefaultProductionEndpoint = "https://log-api.highbrow-inc.com/v1/collect";
         public const string DefaultSandboxEndpoint = "https://sandbox-log-api.highbrow-inc.com/v1/collect";
 
@@ -30,7 +34,13 @@ namespace Highbrow.Core
         public string Region = "kr";
 
         /// <summary>
-        /// Optional custom collector URL override.
+        /// Optional custom collector base URL override (e.g. "https://custom-log.domain.com").
+        /// If not set, automatically resolves to Sandbox or Production base URL based on UseSandbox.
+        /// </summary>
+        public string CustomLogBaseUrl = null;
+
+        /// <summary>
+        /// Optional custom collector URL override (Legacy).
         /// If not set, automatically resolves to Sandbox or Production URL based on UseSandbox.
         /// </summary>
         public string CustomLogEndpointUrl = null;
@@ -103,7 +113,45 @@ namespace Highbrow.Core
         public string CustomClientVersion = null;
 
         /// <summary>
-        /// Resolves active log collector endpoint URL based on UseSandbox and CustomLogEndpointUrl.
+        /// Resolves active log collector base URL based on UseSandbox, CustomLogBaseUrl, or CustomLogEndpointUrl.
+        /// </summary>
+        public string GetResolvedBaseUrl()
+        {
+            if (!string.IsNullOrEmpty(CustomLogBaseUrl))
+            {
+                return CustomLogBaseUrl.TrimEnd('/');
+            }
+
+            if (!string.IsNullOrEmpty(CustomLogEndpointUrl))
+            {
+                return CustomLogEndpointUrl.TrimEnd('/');
+            }
+
+            return UseSandbox ? DefaultSandboxBaseUrl : DefaultProductionBaseUrl;
+        }
+
+        /// <summary>
+        /// Resolves full endpoint URL for a given relative path (e.g. "/v1/log/auth").
+        /// </summary>
+        public string GetEndpointUrl(string relativePath)
+        {
+            if (string.IsNullOrEmpty(relativePath))
+            {
+                return GetResolvedLogEndpointUrl();
+            }
+
+            if (relativePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                relativePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                return relativePath;
+            }
+
+            string baseUrl = GetResolvedBaseUrl();
+            return $"{baseUrl}/{relativePath.TrimStart('/')}";
+        }
+
+        /// <summary>
+        /// Resolves active log collector endpoint URL (Legacy default).
         /// </summary>
         public string GetResolvedLogEndpointUrl()
         {

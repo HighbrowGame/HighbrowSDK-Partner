@@ -15,6 +15,13 @@ namespace Highbrow.Log
     /// </summary>
     public class HighbrowLogManager : IHighbrowModule
     {
+        public const string PathLogAuth = "/v1/log/auth";
+        public const string PathLogNewUser = "/v1/log/new-user";
+        public const string PathLogAlive = "/v1/log/alive";
+        public const string PathLogStoreReceipt = "/v1/log/purchase";
+        public const string PathLogNewPaying = "/v1/log/new-paying";
+        public const string PathLogAd = "/v1/log/ad";
+
         private const string PrefsFirstLaunchKey = "HIGHBROW_SDK_FIRST_LAUNCH_FLAG";
         private static HighbrowLogManager instance;
 
@@ -180,7 +187,7 @@ namespace Highbrow.Log
             };
 
             lastActiveTimeUtc = DateTime.UtcNow;
-            SendLog("LogAuth", JsonUtility.ToJson(log));
+            SendLog(PathLogAuth, "LogAuth", JsonUtility.ToJson(log));
         }
 
         /// <summary>
@@ -206,7 +213,7 @@ namespace Highbrow.Log
                 Region = ResolveRegion()
             };
 
-            SendLog("LogNewUser", JsonUtility.ToJson(log));
+            SendLog(PathLogNewUser, "LogNewUser", JsonUtility.ToJson(log));
         }
 
         /// <summary>
@@ -244,7 +251,7 @@ namespace Highbrow.Log
                 Region = ResolveRegion()
             };
 
-            SendLog("LogStoreReceipt", JsonUtility.ToJson(log));
+            SendLog(PathLogStoreReceipt, "LogStoreReceipt", JsonUtility.ToJson(log));
 
             if (isFirstPurchase)
             {
@@ -271,7 +278,7 @@ namespace Highbrow.Log
                 Region = ResolveRegion()
             };
 
-            SendLog("LogNewPaying", JsonUtility.ToJson(log));
+            SendLog(PathLogNewPaying, "LogNewPaying", JsonUtility.ToJson(log));
         }
 
         /// <summary>
@@ -301,7 +308,7 @@ namespace Highbrow.Log
                 Region = ResolveRegion()
             };
 
-            SendLog("LogAd", JsonUtility.ToJson(log));
+            SendLog(PathLogAd, "LogAd", JsonUtility.ToJson(log));
         }
 
         #endregion
@@ -362,35 +369,35 @@ namespace Highbrow.Log
                 Region = ResolveRegion()
             };
 
-            SendLog("LogAlive", JsonUtility.ToJson(log));
+            SendLog(PathLogAlive, "LogAlive", JsonUtility.ToJson(log));
         }
 
         #endregion
 
         #region Network Transmission & Offline Retry
 
-        private void SendLog(string logType, string jsonPayload)
+        private void SendLog(string logPath, string logType, string jsonPayload)
         {
             if (!IsInitialized || httpClient == null)
             {
-                HighbrowLogger.LogWarning($"SDK not initialized. Caching [{logType}] into offline queue.");
-                offlineQueue?.Enqueue(logType, jsonPayload);
+                HighbrowLogger.LogWarning($"SDK not initialized. Caching [{logPath}] into offline queue.");
+                offlineQueue?.Enqueue(logPath, jsonPayload);
                 return;
             }
 
-            string endpoint = config?.GetResolvedLogEndpointUrl();
+            string endpoint = config?.GetEndpointUrl(logPath);
             string appKey = config?.AppKey;
 
             httpClient.PostJson(endpoint, appKey, logType, jsonPayload, (success, response) =>
             {
                 if (!success)
                 {
-                    HighbrowLogger.LogWarning($"Failed to transmit [{logType}]. Enqueueing to PlayerPrefs offline cache.");
-                    offlineQueue.Enqueue(logType, jsonPayload);
+                    HighbrowLogger.LogWarning($"Failed to transmit [{logPath}]. Enqueueing to PlayerPrefs offline cache.");
+                    offlineQueue.Enqueue(logPath, jsonPayload);
                 }
                 else
                 {
-                    HighbrowLogger.Log($"[{logType}] Delivered successfully.");
+                    HighbrowLogger.Log($"[{logPath}] Delivered successfully.");
                 }
             });
         }
@@ -436,7 +443,10 @@ namespace Highbrow.Log
                 bool isDone = false;
                 bool isSuccess = false;
 
-                httpClient.PostJson(config?.GetResolvedLogEndpointUrl(), config?.AppKey, item.LogType, item.JsonPayload, (success, res) =>
+                string resolvedEndpoint = ResolveEndpointFromQueuedLog(item.LogType);
+                string logTypeHeader = ExtractLogTypeName(item.LogType);
+
+                httpClient.PostJson(resolvedEndpoint, config?.AppKey, logTypeHeader, item.JsonPayload, (success, res) =>
                 {
                     isSuccess = success;
                     isDone = true;
@@ -465,6 +475,63 @@ namespace Highbrow.Log
             }
 
             onCompleted?.Invoke(successCount);
+        }
+
+        private string ResolveEndpointFromQueuedLog(string logTypeOrPath)
+        {
+            if (string.IsNullOrEmpty(logTypeOrPath))
+            {
+                return config?.GetResolvedLogEndpointUrl();
+            }
+
+            if (logTypeOrPath.StartsWith("/") ||
+                logTypeOrPath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                logTypeOrPath.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                return config?.GetEndpointUrl(logTypeOrPath);
+            }
+
+            // Backwards compatibility for legacy logType strings
+            switch (logTypeOrPath)
+            {
+                case "LogAuth":
+                    return config?.GetEndpointUrl(PathLogAuth);
+                case "LogNewUser":
+                    return config?.GetEndpointUrl(PathLogNewUser);
+                case "LogAlive":
+                    return config?.GetEndpointUrl(PathLogAlive);
+                case "LogStoreReceipt":
+                    return config?.GetEndpointUrl(PathLogStoreReceipt);
+                case "LogNewPaying":
+                    return config?.GetEndpointUrl(PathLogNewPaying);
+                case "LogAd":
+                    return config?.GetEndpointUrl(PathLogAd);
+                default:
+                    return config?.GetResolvedLogEndpointUrl();
+            }
+        }
+
+        private string ExtractLogTypeName(string logTypeOrPath)
+        {
+            if (string.IsNullOrEmpty(logTypeOrPath)) return string.Empty;
+
+            switch (logTypeOrPath)
+            {
+                case PathLogAuth:
+                    return "LogAuth";
+                case PathLogNewUser:
+                    return "LogNewUser";
+                case PathLogAlive:
+                    return "LogAlive";
+                case PathLogStoreReceipt:
+                    return "LogStoreReceipt";
+                case PathLogNewPaying:
+                    return "LogNewPaying";
+                case PathLogAd:
+                    return "LogAd";
+                default:
+                    return logTypeOrPath;
+            }
         }
 
         #endregion

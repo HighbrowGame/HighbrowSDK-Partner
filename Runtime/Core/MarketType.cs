@@ -1,4 +1,4 @@
-namespace Highbrow.Log
+namespace Highbrow.Core
 {
     /// <summary>
     /// App distribution market type.

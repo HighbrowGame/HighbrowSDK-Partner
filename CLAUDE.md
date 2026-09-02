@@ -14,11 +14,12 @@ For the full AI agent guide, see [AGENTS.md](file:///Volumes/ExtDisk01/Projects/
 
 ## Essential API Patterns (4 Core Fact Logs)
 
-### 1. Initialize SDK (2-Tier Routing)
+### 1. Initialize SDK (2-Tier Routing & Dynamic Market)
 ```csharp
 HighbrowSDK.Initialize(new HighbrowConfig
 {
     AppKey = "YOUR_APP_KEY",
+    Market = targetMarket, // Dynamically resolved store (OneStore, GooglePlay, AppleStore, etc.)
     UseSandbox = false, // true for dev/test, false for production
     EnableLog = true,
     AutoSessionTracking = true // 5-minute session heartbeat (Alive) starts automatically

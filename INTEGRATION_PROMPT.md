@@ -54,9 +54,10 @@
 
 - **사전 질문 응답을 받기 전까지는 절대 프로젝트 파일을 수정하지 마세요.**
 - 개발자가 질문에 답변하면, 답변을 분석하여:
-  1. SDK 초기화 코드 (`HighbrowSDK.Initialize(...)`) 구성 (UseSandbox 설정 포함)
+  1. SDK 초기화 코드 (`HighbrowSDK.Initialize(...)`) 구성 (UseSandbox 설정 및 프로젝트 내 원스토어/구글 등 빌드 심볼을 고려한 `config.Market` 동적 분기 코드 포함)
   2. 수정 대상 파일 및 삽입 위치 목록
   3. `TrackAuth`, `TrackPurchase`, `TrackAd`, `SessionTracking` 적용 계획
   을 작성해 보여주고, **"이 계획대로 연동을 진행할까요? (Yes / 수정 요청)"**을 물어보세요.
+- 국가 코드(Country)는 디바이스 Locale에서 SDK가 자동 추출하므로 개발자에게 입력을 요구하지 마세요.
 - 승인을 받은 후에만 `using Highbrow.Core;`, `using Highbrow.Log;`, `using Highbrow.Ad;`를 추가하고 코드를 안전하게 삽입하세요.
 ```

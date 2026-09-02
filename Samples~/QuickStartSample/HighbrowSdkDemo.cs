@@ -22,10 +22,25 @@ namespace Highbrow.Samples
 
         private void Start()
         {
+            // Resolve target market dynamically (OneStore, GooglePlay, AppleStore, Steam)
+            MarketType targetMarket = MarketType.None;
+#if UNITY_IOS
+            targetMarket = MarketType.AppleStore;
+#elif UNITY_ANDROID
+            #if ONESTORE
+            targetMarket = MarketType.OneStore;
+            #else
+            targetMarket = MarketType.GooglePlay;
+            #endif
+#elif UNITY_STANDALONE_WIN
+            targetMarket = MarketType.Steam;
+#endif
+
             // 1. Initialize Highbrow SDK (2-tier automatic routing: Sandbox vs Production)
             HighbrowConfig config = new HighbrowConfig
             {
                 AppKey = appKey,
+                Market = targetMarket, // Dynamically resolved store
                 UseSandbox = useSandbox, // Set false for live release
                 EnableLog = true,
                 AutoSessionTracking = true, // 5-min session heartbeat (Alive) starts automatically

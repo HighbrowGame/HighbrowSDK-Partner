@@ -159,7 +159,7 @@ namespace Highbrow.Log
                 AccountId = accountId ?? string.Empty,
                 Suid = ResolveSuid(suid),
                 Duid = HighbrowContext.GetDuid(config?.CustomDuid),
-                Market = HighbrowContext.GetMarketType(config?.CustomMarket),
+                Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
                 Os = HighbrowContext.GetOsType(),
                 Country = HighbrowContext.GetCountry(config?.CustomCountry),
                 IpAddress = ipAddress ?? string.Empty,
@@ -196,7 +196,7 @@ namespace Highbrow.Log
                 Time = HighbrowContext.GetUtcNowIsoString(),
                 Suid = targetSuid,
                 ReceiptId = receiptId ?? string.Empty,
-                Market = HighbrowContext.GetMarketType(config?.CustomMarket),
+                Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
                 Os = HighbrowContext.GetOsType(),
                 Country = HighbrowContext.GetCountry(config?.CustomCountry),
                 Price = price,
@@ -229,7 +229,7 @@ namespace Highbrow.Log
             {
                 Time = HighbrowContext.GetUtcNowIsoString(),
                 Suid = ResolveSuid(suid),
-                Market = HighbrowContext.GetMarketType(config?.CustomMarket),
+                Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
                 Os = HighbrowContext.GetOsType(),
                 Country = HighbrowContext.GetCountry(config?.CustomCountry),
                 AdType = (int)adType,
@@ -288,7 +288,7 @@ namespace Highbrow.Log
                 AccountType = (int)currentAccountType,
                 Suid = ResolveSuid(null),
                 Duid = HighbrowContext.GetDuid(config?.CustomDuid),
-                Market = HighbrowContext.GetMarketType(config?.CustomMarket),
+                Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
                 Os = HighbrowContext.GetOsType(),
                 Country = HighbrowContext.GetCountry(config?.CustomCountry)
             };

@@ -103,7 +103,14 @@ namespace Highbrow.Core
         public string CustomCountry = null;
 
         /// <summary>
-        /// Custom Market type override. If null, auto-detected from runtime platform.
+        /// Target distribution market / store (e.g. GooglePlay, OneStore, AppleStore, Steam).
+        /// Recommended to set dynamically via preprocessor symbols.
+        /// If MarketType.None, auto-resolves based on runtime platform.
+        /// </summary>
+        public MarketType Market = MarketType.None;
+
+        /// <summary>
+        /// Custom Market type override (integer). If null, config.Market or auto-detected platform is used.
         /// </summary>
         public int? CustomMarket = null;
 

@@ -133,9 +133,24 @@ public class GameInitializer : MonoBehaviour
 {
     private void Awake()
     {
+        // 타겟 스토어에 맞춘 동적 마켓 분기 (원스토어, 구글, 애플, 스팀 등)
+        MarketType targetMarket = MarketType.None;
+#if UNITY_IOS
+        targetMarket = MarketType.AppleStore;
+#elif UNITY_ANDROID
+    #if ONESTORE
+        targetMarket = MarketType.OneStore;
+    #else
+        targetMarket = MarketType.GooglePlay;
+    #endif
+#elif UNITY_STANDALONE_WIN
+        targetMarket = MarketType.Steam;
+#endif
+
         HighbrowConfig config = new HighbrowConfig
         {
             AppKey = "YOUR_ISSUED_HIGHBROW_APP_KEY",   // 하이브로 발급 앱 키
+            Market = targetMarket,                      // 동적으로 감지된 타겟 마켓 지정
             UseSandbox = false,                         // true: 샌드박스 테스트, false: 상용 라이브 배포
             
             EnableLog = true,                           // 로그 모듈 활성화

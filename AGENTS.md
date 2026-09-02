@@ -29,9 +29,24 @@ Initialize once in the game's startup bootstrap/splash script (e.g. `GameInitial
 using Highbrow.Core;
 using Highbrow.Log;
 
+// Dynamically resolve market based on platform and build symbols (OneStore, GooglePlay, AppleStore, Steam)
+MarketType targetMarket = MarketType.None;
+#if UNITY_IOS
+targetMarket = MarketType.AppleStore;
+#elif UNITY_ANDROID
+    #if ONESTORE
+    targetMarket = MarketType.OneStore;
+    #else
+    targetMarket = MarketType.GooglePlay;
+    #endif
+#elif UNITY_STANDALONE_WIN
+targetMarket = MarketType.Steam;
+#endif
+
 HighbrowConfig config = new HighbrowConfig
 {
     AppKey = "PARTNER_APP_KEY",         // Issued by Highbrow
+    Market = targetMarket,              // Dynamically resolved store
     UseSandbox = false,                 // true: Sandbox/DEV collector, false: Production collector
     Region = "kr",                     // "kr", "us", "dev", "qa", etc.
     EnableLog = true,

@@ -88,11 +88,17 @@ namespace Highbrow.Core
         }
 
         /// <summary>
-        /// Auto-detects Market type integer code.
+        /// Resolves Market type integer code.
+        /// Prioritizes developer-specified config.Market or customMarket, fallback to runtime platform.
         /// 1: AppleStore, 2: GooglePlay, 3: Steam, 4: OneStore, 5: SamsungStore, 6: VngWeb, 0: None
         /// </summary>
-        public static int GetMarketType(int? customMarket = null)
+        public static int GetMarketType(MarketType configMarket = MarketType.None, int? customMarket = null)
         {
+            if (configMarket != MarketType.None)
+            {
+                return (int)configMarket;
+            }
+
             if (customMarket.HasValue && customMarket.Value > 0)
             {
                 return customMarket.Value;
@@ -104,17 +110,19 @@ namespace Highbrow.Core
                 case RuntimePlatform.OSXPlayer:
                     return 1; // AppleStore
                 case RuntimePlatform.Android:
-                    return 2; // GooglePlay default
+                    return 2; // GooglePlay default fallback
                 case RuntimePlatform.WindowsPlayer:
                 case RuntimePlatform.WindowsEditor:
-                    return 3; // Steam default for Windows
+                    return 3; // Steam default fallback
                 default:
                     return 0; // None
             }
         }
 
         /// <summary>
-        /// Gets 2-letter ISO Country code (e.g. "KR", "US").
+        /// Resolves 2-letter ISO Country code (e.g. "KR", "US", "JP", "GB", "TW").
+        /// Extracts accurate country code from OS RegionInfo or CultureInfo locale without language guessing.
+        /// If undetectable, returns empty string so the collector server Geo-IP can inject the true IP country.
         /// </summary>
         public static string GetCountry(string customCountry = null)
         {
@@ -123,43 +131,40 @@ namespace Highbrow.Core
                 return customCountry.ToUpperInvariant();
             }
 
+            // 1. Try .NET RegionInfo (OS Device Region Setting)
             try
             {
                 RegionInfo currentRegion = RegionInfo.CurrentRegion;
-                if (currentRegion != null && !string.IsNullOrEmpty(currentRegion.TwoLetterISORegionName))
+                if (currentRegion != null && !string.IsNullOrEmpty(currentRegion.TwoLetterISORegionName) && currentRegion.TwoLetterISORegionName.Length == 2)
                 {
                     return currentRegion.TwoLetterISORegionName.ToUpperInvariant();
                 }
             }
             catch
             {
-                // Fallback to language-based detection
+                // Fallback to CultureInfo
             }
 
-            switch (Application.systemLanguage)
+            // 2. Try CultureInfo.CurrentCulture ("ko-KR", "en-US", "zh-TW", "en-GB", etc.)
+            try
             {
-                case SystemLanguage.Korean:
-                    return "KR";
-                case SystemLanguage.Japanese:
-                    return "JP";
-                case SystemLanguage.Chinese:
-                case SystemLanguage.ChineseSimplified:
-                case SystemLanguage.ChineseTraditional:
-                    return "CN";
-                case SystemLanguage.Vietnamese:
-                    return "VN";
-                case SystemLanguage.German:
-                    return "DE";
-                case SystemLanguage.French:
-                    return "FR";
-                case SystemLanguage.Spanish:
-                    return "ES";
-                case SystemLanguage.Russian:
-                    return "RU";
-                case SystemLanguage.English:
-                default:
-                    return "US";
+                CultureInfo currentCulture = CultureInfo.CurrentCulture;
+                if (currentCulture != null && !string.IsNullOrEmpty(currentCulture.Name))
+                {
+                    string[] parts = currentCulture.Name.Split('-');
+                    if (parts.Length > 1 && parts[parts.Length - 1].Length == 2)
+                    {
+                        return parts[parts.Length - 1].ToUpperInvariant();
+                    }
+                }
             }
+            catch
+            {
+                // Unresolvable locale
+            }
+
+            // 3. Fallback: Return empty string to let collector server inject accurate Country from IP header (Cloudflare / CloudFront Geo-IP)
+            return string.Empty;
         }
 
         /// <summary>

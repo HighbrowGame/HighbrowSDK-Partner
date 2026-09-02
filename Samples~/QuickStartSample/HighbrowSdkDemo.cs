@@ -6,8 +6,13 @@ using UnityEngine;
 namespace Highbrow.Samples
 {
     /// <summary>
-    /// Quick-start sample demonstrating SDK initialization, user authentication,
-    /// session tracking, in-app purchase logging, and ad tracking.
+    /// Quick-start sample demonstrating Highbrow SDK integration.
+    /// The client SDK only needs to emit 4 core fact logs:
+    /// 1. Auth (Login)
+    /// 2. Alive (Session Heartbeat - Automated)
+    /// 3. Purchase (IAP)
+    /// 4. Advertise (Ad Impression)
+    /// Derived metrics (New User, First Purchase, DAU) are calculated automatically on the Highbrow Collector backend.
     /// </summary>
     public class HighbrowSdkDemo : MonoBehaviour
     {
@@ -23,8 +28,8 @@ namespace Highbrow.Samples
                 AppKey = appKey,
                 UseSandbox = useSandbox, // Set false for live release
                 EnableLog = true,
-                AutoSessionTracking = true,
-                SessionIntervalSeconds = 300f, // 5 minutes
+                AutoSessionTracking = true, // 5-min session heartbeat (Alive) starts automatically
+                SessionIntervalSeconds = 300f,
                 DebugMode = true
             };
 
@@ -33,10 +38,9 @@ namespace Highbrow.Samples
             Debug.Log($"[HighbrowSdkDemo] Highbrow SDK Initialized (BaseUrl: {config.GetResolvedBaseUrl()})");
         }
 
-        // Example: Called when user logs in via Google/Apple/Guest
+        // 1. Called on user login success (Google, Apple, Guest, etc.)
         public void OnUserLoginSuccess(string suid, string accountId, AccountType accountType, string nickname)
         {
-            // 2. Track Authentication Log
             HighbrowLog.TrackAuth(
                 suid: suid,
                 accountId: accountId,
@@ -44,43 +48,25 @@ namespace Highbrow.Samples
                 nickname: nickname,
                 result: "OK"
             );
-
-            // If user is brand new (character created)
-            bool isBrandNewUser = false; // Replace with your game's check
-            if (isBrandNewUser)
-            {
-                HighbrowLog.TrackNewUser(suid, accountType);
-            }
         }
 
-        // Example: Called when IAP purchase succeeds
-        public void OnPurchaseSuccess(string receiptId, float price, string priceId, int productId, string productName, bool isFirstPurchase)
+        // 2. Called on in-app purchase success (Unity IAP ProcessPurchase, etc.)
+        public void OnPurchaseSuccess(string receiptId, float price, string priceId, int productId, string productName)
         {
-            // 3. Track Purchase Log
             HighbrowLog.TrackPurchase(
                 receiptId: receiptId,
                 price: price,
                 priceId: priceId,
                 productId: productId,
                 productName: productName,
-                purchaseTime: DateTime.UtcNow,
-                isFirstPurchase: isFirstPurchase
+                purchaseTime: DateTime.UtcNow
             );
         }
 
-        // Example: Called when Ad is viewed
+        // 3. Called on ad view impression
         public void OnAdViewed(AdType adType)
         {
-            // 4. Track Ad View Log
             HighbrowLog.TrackAd(adType);
-        }
-
-        // Example: Called on date change for DAU metrics
-        public void OnDailyCheck(DateTime lastActiveTime, DateTime? userCreateTime)
-        {
-            // 5. Track Daily Active User (DAU)
-            HighbrowLog.TrackDailyActiveUserSuid(lastActiveTime, userCreateTime);
-            HighbrowLog.TrackDailyActiveUserDuid(userCreateTime);
         }
     }
 }

@@ -10,21 +10,20 @@ namespace Highbrow.Log
 {
     /// <summary>
     /// Core Log Module Manager for Highbrow SDK.
-    /// Handles log generation, auto-injection of environment metadata, session heartbeat coroutines,
-    /// HTTP transmission via UnityWebRequest, and offline PlayerPrefs retry caching.
+    /// Handles the 4 core fact logs (Auth, Alive, Purchase, Advertise), environment auto-injection,
+    /// 5-minute session heartbeat coroutines, UnityWebRequest transmission, and offline PlayerPrefs retry caching.
+    /// Derived metrics (New User, First Purchase, DAU) are processed automatically by the Highbrow Collector backend.
     /// </summary>
     public class HighbrowLogManager : IHighbrowModule
     {
         public const string PathLogAuth = "/v1/log/auth";
-        public const string PathLogNewUser = "/v1/log/new-user";
         public const string PathLogAlive = "/v1/log/alive";
-        public const string PathLogStoreReceipt = "/v1/log/purchase";
-        public const string PathLogNewPaying = "/v1/log/new-paying";
+        public const string PathLogPurchase = "/v1/log/purchase";
         public const string PathLogAd = "/v1/log/ad";
-        public const string PathLogDauSuid = "/v1/log/dau-suid";
-        public const string PathLogDauDuid = "/v1/log/dau-duid";
 
-        private const string PrefsFirstLaunchKey = "HIGHBROW_SDK_FIRST_LAUNCH_FLAG";
+        // Legacy alias compatibility
+        public const string PathLogStoreReceipt = PathLogPurchase;
+
         private static HighbrowLogManager instance;
 
         public static HighbrowLogManager Instance
@@ -54,8 +53,6 @@ namespace Highbrow.Log
         private string currentAccountId;
         private AccountType currentAccountType = AccountType.None;
         private DateTime? userCreateTimeUtc;
-        private DateTime lastActiveTimeUtc = DateTime.UtcNow;
-        private bool isNewDuidCached;
 
         public string CurrentSuid => currentSuid;
         public string CurrentAccountId => currentAccountId;
@@ -79,18 +76,6 @@ namespace Highbrow.Log
             config = sdkConfig ?? new HighbrowConfig();
             httpClient = new HighbrowHttpClient();
             offlineQueue = new HighbrowOfflineQueue(config.MaxOfflineQueueSize);
-
-            // Determine if this is a new DUID (First launch)
-            if (!PlayerPrefs.HasKey(PrefsFirstLaunchKey))
-            {
-                isNewDuidCached = true;
-                PlayerPrefs.SetInt(PrefsFirstLaunchKey, 1);
-                PlayerPrefs.Save();
-            }
-            else
-            {
-                isNewDuidCached = false;
-            }
 
             IsInitialized = true;
             HighbrowLogger.Log("HighbrowLogManager initialized successfully.");
@@ -153,10 +138,11 @@ namespace Highbrow.Log
 
         #endregion
 
-        #region Public Tracking APIs
+        #region 1. Auth (Authentication Log)
 
         /// <summary>
         /// Tracks user authentication / login completion.
+        /// Backend automatically derives New User and DAU metrics based on SUID/DUID state DB.
         /// </summary>
         /// <param name="suid">User unique ID.</param>
         /// <param name="accountId">Platform account ID (e.g. Google sub, Apple user identifier).</param>
@@ -184,38 +170,16 @@ namespace Highbrow.Log
                 Result = result ?? "OK"
             };
 
-            lastActiveTimeUtc = DateTime.UtcNow;
             SendLog(PathLogAuth, "LogAuth", JsonUtility.ToJson(log));
         }
 
-        /// <summary>
-        /// Tracks new user registration / character creation.
-        /// </summary>
-        /// <param name="suid">User unique ID (optional if previously set).</param>
-        /// <param name="accountType">Optional account type override.</param>
-        public void TrackNewUser(string suid = null, AccountType? accountType = null)
-        {
-            AccountType targetAccountType = accountType ?? currentAccountType;
-            string targetSuid = ResolveSuid(suid);
+        #endregion
 
-            NewUserLog log = new NewUserLog
-            {
-                Time = HighbrowContext.GetUtcNowIsoString(),
-                AccountType = (int)targetAccountType,
-                Suid = targetSuid,
-                Duid = HighbrowContext.GetDuid(config?.CustomDuid),
-                Market = HighbrowContext.GetMarketType(config?.CustomMarket),
-                Os = HighbrowContext.GetOsType(),
-                Country = HighbrowContext.GetCountry(config?.CustomCountry),
-                IsNewDuid = isNewDuidCached
-            };
-
-            SendLog(PathLogNewUser, "LogNewUser", JsonUtility.ToJson(log));
-        }
+        #region 2. Purchase (In-App Purchase Log)
 
         /// <summary>
         /// Tracks in-app purchase store receipt.
-        /// Automatically fires TrackFirstPurchase if isFirstPurchase is true.
+        /// Backend automatically derives First Purchase (New Paying) metrics by querying user purchase history in DB.
         /// </summary>
         /// <param name="receiptId">Store receipt transaction ID (Apple transactionId / Google orderId).</param>
         /// <param name="price">Product price in USD/local currency standard.</param>
@@ -223,9 +187,8 @@ namespace Highbrow.Log
         /// <param name="productId">Internal game product numeric ID.</param>
         /// <param name="productName">Product name string.</param>
         /// <param name="purchaseTime">Purchase timestamp (UTC). Defaults to UtcNow.</param>
-        /// <param name="isFirstPurchase">Whether this transaction is the user's first purchase.</param>
         /// <param name="suid">Optional SUID override.</param>
-        public void TrackPurchase(string receiptId, float price, string priceId, int productId, string productName, DateTime? purchaseTime = null, bool isFirstPurchase = false, string suid = null)
+        public void TrackPurchase(string receiptId, float price, string priceId, int productId, string productName, DateTime? purchaseTime = null, string suid = null)
         {
             DateTime pTime = purchaseTime ?? DateTime.UtcNow;
             string targetSuid = ResolveSuid(suid);
@@ -247,44 +210,20 @@ namespace Highbrow.Log
                 DeviceInfo = HighbrowContext.GetDeviceInfo()
             };
 
-            SendLog(PathLogStoreReceipt, "LogStoreReceipt", JsonUtility.ToJson(log));
-
-            if (isFirstPurchase)
-            {
-                TrackFirstPurchase(productId, pTime, targetSuid);
-            }
+            SendLog(PathLogPurchase, "LogStoreReceipt", JsonUtility.ToJson(log));
         }
 
-        /// <summary>
-        /// Tracks first purchase log when an account makes their very first IAP purchase.
-        /// </summary>
-        public void TrackFirstPurchase(int productId, DateTime? purchaseTime = null, string suid = null)
-        {
-            DateTime pTime = purchaseTime ?? DateTime.UtcNow;
+        #endregion
 
-            NewPayingLog log = new NewPayingLog
-            {
-                Time = HighbrowContext.GetUtcNowIsoString(),
-                Suid = ResolveSuid(suid),
-                Market = HighbrowContext.GetMarketType(config?.CustomMarket),
-                Os = HighbrowContext.GetOsType(),
-                Country = HighbrowContext.GetCountry(config?.CustomCountry),
-                ProductId = productId,
-                PurchaseTime = HighbrowContext.FormatUtcIsoString(pTime)
-            };
-
-            SendLog(PathLogNewPaying, "LogNewPaying", JsonUtility.ToJson(log));
-        }
+        #region 3. Advertise (Ad Impression Log)
 
         /// <summary>
-        /// Tracks advertisement view lifecycle.
+        /// Tracks advertisement view event.
         /// </summary>
         /// <param name="adType">Ad placement format type.</param>
-        /// <param name="isComplete">Optional completion status (preserved for backwards compatibility).</param>
-        /// <param name="userAdSkipPackage">Optional ad-skip package flag (preserved for backwards compatibility).</param>
         /// <param name="customAdTypeName">Optional string representation override of AdType.</param>
         /// <param name="suid">Optional SUID override.</param>
-        public void TrackAd(AdType adType, bool isComplete = true, bool userAdSkipPackage = false, string customAdTypeName = null, string suid = null)
+        public void TrackAd(AdType adType, string customAdTypeName = null, string suid = null)
         {
             string adTypeName = !string.IsNullOrEmpty(customAdTypeName) ? customAdTypeName : adType.ToString();
 
@@ -302,52 +241,9 @@ namespace Highbrow.Log
             SendLog(PathLogAd, "LogAd", JsonUtility.ToJson(log));
         }
 
-        /// <summary>
-        /// Tracks daily active unique user (DAU SUID) log recorded on daily date transition or market change.
-        /// </summary>
-        public void TrackDailyActiveUserSuid(DateTime lastActiveTime, DateTime? userCreateTime = null, string suid = null)
-        {
-            DateTime createTime = userCreateTime ?? userCreateTimeUtc ?? DateTime.UtcNow;
-
-            DailyActiveUserSuidLog log = new DailyActiveUserSuidLog
-            {
-                Time = HighbrowContext.GetUtcNowIsoString(),
-                Suid = ResolveSuid(suid),
-                Market = HighbrowContext.GetMarketType(config?.CustomMarket),
-                Os = HighbrowContext.GetOsType(),
-                Country = HighbrowContext.GetCountry(config?.CustomCountry),
-                LastActiveTime = HighbrowContext.FormatUtcIsoString(lastActiveTime),
-                UserCreateTime = HighbrowContext.FormatUtcIsoString(createTime)
-            };
-
-            SendLog(PathLogDauSuid, "LogDailyActiveUserSuid", JsonUtility.ToJson(log));
-        }
-
-        /// <summary>
-        /// Tracks daily active unique device (DAU DUID) log recorded on daily date transition.
-        /// </summary>
-        public void TrackDailyActiveUserDuid(DateTime? userCreateTime = null, bool? isNewDuid = null, string duid = null)
-        {
-            DateTime createTime = userCreateTime ?? userCreateTimeUtc ?? DateTime.UtcNow;
-            bool isNew = isNewDuid ?? isNewDuidCached;
-
-            DailyActiveUserDuidLog log = new DailyActiveUserDuidLog
-            {
-                Time = HighbrowContext.GetUtcNowIsoString(),
-                Duid = !string.IsNullOrEmpty(duid) ? duid : HighbrowContext.GetDuid(config?.CustomDuid),
-                Market = HighbrowContext.GetMarketType(config?.CustomMarket),
-                Os = HighbrowContext.GetOsType(),
-                Country = HighbrowContext.GetCountry(config?.CustomCountry),
-                UserCreateTime = HighbrowContext.FormatUtcIsoString(createTime),
-                IsNewDuid = isNew
-            };
-
-            SendLog(PathLogDauDuid, "LogDailyActiveUserDuid", JsonUtility.ToJson(log));
-        }
-
         #endregion
 
-        #region Session Heartbeat Tracking
+        #region 4. Alive (Session Heartbeat Tracking)
 
         /// <summary>
         /// Starts periodic session heartbeat tracking (default: 5 minutes = 300 seconds).
@@ -496,7 +392,6 @@ namespace Highbrow.Log
                 }
                 else
                 {
-                    // If network is still failing, abort current flush cycle
                     HighbrowLogger.LogWarning("Network error during queue flush. Pausing retry batch.");
                     break;
                 }
@@ -529,21 +424,14 @@ namespace Highbrow.Log
             {
                 case "LogAuth":
                     return config?.GetEndpointUrl(PathLogAuth);
-                case "LogNewUser":
-                    return config?.GetEndpointUrl(PathLogNewUser);
                 case "LogAlive":
                     return config?.GetEndpointUrl(PathLogAlive);
                 case "LogStoreReceipt":
-                    return config?.GetEndpointUrl(PathLogStoreReceipt);
-                case "LogNewPaying":
-                    return config?.GetEndpointUrl(PathLogNewPaying);
+                case "LogPurchase":
+                    return config?.GetEndpointUrl(PathLogPurchase);
                 case "LogAd":
                 case "LogAdvertisement":
                     return config?.GetEndpointUrl(PathLogAd);
-                case "LogDailyActiveUserSuid":
-                    return config?.GetEndpointUrl(PathLogDauSuid);
-                case "LogDailyActiveUserDuid":
-                    return config?.GetEndpointUrl(PathLogDauDuid);
                 default:
                     return config?.GetResolvedLogEndpointUrl();
             }
@@ -557,20 +445,12 @@ namespace Highbrow.Log
             {
                 case PathLogAuth:
                     return "LogAuth";
-                case PathLogNewUser:
-                    return "LogNewUser";
                 case PathLogAlive:
                     return "LogAlive";
-                case PathLogStoreReceipt:
+                case PathLogPurchase:
                     return "LogStoreReceipt";
-                case PathLogNewPaying:
-                    return "LogNewPaying";
                 case PathLogAd:
                     return "LogAd";
-                case PathLogDauSuid:
-                    return "LogDailyActiveUserSuid";
-                case PathLogDauDuid:
-                    return "LogDailyActiveUserDuid";
                 default:
                     return logTypeOrPath;
             }

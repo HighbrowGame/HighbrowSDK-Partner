@@ -12,7 +12,7 @@ For the full AI agent guide, see [AGENTS.md](file:///Volumes/ExtDisk01/Projects/
 - `using Highbrow.Log;` (Log APIs, Enums, Models)
 - `using Highbrow.Ad;` (In-house cross promotion ads)
 
-## Essential API Patterns
+## Essential API Patterns (4 Core Fact Logs)
 
 ### 1. Initialize SDK (2-Tier Routing)
 ```csharp
@@ -21,20 +21,18 @@ HighbrowSDK.Initialize(new HighbrowConfig
     AppKey = "YOUR_APP_KEY",
     UseSandbox = false, // true for dev/test, false for production
     EnableLog = true,
-    AutoSessionTracking = true
+    AutoSessionTracking = true // 5-minute session heartbeat (Alive) starts automatically
 });
 ```
 
-### 2. Track Auth
+### 2. Track Auth (Login)
 ```csharp
 HighbrowLog.TrackAuth(suid, accountId, AccountType.GooglePlay, nickname);
-// Only call TrackNewUser if the game can distinguish new accounts:
-// HighbrowLog.TrackNewUser(suid, AccountType.GooglePlay);
 ```
 
-### 3. Track IAP Purchase
+### 3. Track IAP Purchase (Receipt)
 ```csharp
-HighbrowLog.TrackPurchase(receiptId, price, priceId, productId, productName, isFirstPurchase: false);
+HighbrowLog.TrackPurchase(receiptId, price, priceId, productId, productName);
 ```
 
 ### 4. Track Ad & Show Highbrow House Ads
@@ -46,13 +44,7 @@ HighbrowLog.TrackAd(AdType.RewardVideo);
 HighbrowAd.Show(onCompleted: () => { /* reward */ });
 ```
 
-### 5. Track DAU (Daily Active User)
-```csharp
-HighbrowLog.TrackDailyActiveUserSuid(lastActiveTime, userCreateTime);
-HighbrowLog.TrackDailyActiveUserDuid(userCreateTime, isNewDuid);
-```
-
-## Partner Limitations Guardrails
-1. **Unknown New User:** Do not call `HighbrowLog.TrackNewUser()`. `TrackAuth` alone is sufficient.
-2. **Unknown First Purchase:** Set `isFirstPurchase: false`. The backend handles lifetime first-purchase calculation.
+## Architectural Guardrails
+1. **4 Core Fact Logs Only:** Client only emits `Auth`, `Alive` (Auto), `Purchase`, and `Advertise`.
+2. **Server-Derived Metrics:** New User, First Purchase, and DAU/DADU are derived automatically on the Highbrow Collector backend via state DB. Never write client-side logic to determine these.
 3. **Surgical Modifications:** Only add SDK tracking calls at exact success/callback locations without altering surrounding game logic.

@@ -31,28 +31,22 @@
 ### 2. 유저 식별자 (SUID) 및 로그인
 - 게임 내 유저 고유 ID(SUID) 변수명 또는 획득 경로: (예: `userSeq`, `FirebaseUser.UserId`, `uuid` 등)
 - 지원하는 소셜/인증 수단: (예: Google, Apple, Guest, Facebook 등)
+- 로그인 성공 콜백이 위치한 클래스/파일: (예: `LoginManager.cs`, `TitleScene.cs`)
 
-### 3. 신규 유저(New User) 판별 가능 여부
-- [ ] **(A) 판별 가능:** 게임 서버 또는 로컬에서 신규 계정/캐릭터 생성 여부를 명확히 알 수 있음 -> `TrackNewUser` 연동
-- [ ] **(B) 판별 불가:** 클라이언트 단에서 신규 여부를 구분하기 어려움 -> `TrackNewUser` 호출 생략 (`TrackAuth`만 연동)
-- [ ] **(C) 로컬 플래그 대체:** PlayerPrefs를 이용해 로컬 첫 실행 여부로 신규 유저 판단 희망
-
-### 4. 첫 결제(First Purchase) 판별 가능 여부
-- [ ] **(A) 판별 가능:** 유저의 생애 첫 인앱 결제 여부를 변수/플래그로 알 수 있음 -> 첫 결제 시 `isFirstPurchase: true` 전달
-- [ ] **(B) 판별 불가:** 첫 결제 여부를 알 수 없음 -> 기본값 `isFirstPurchase: false`로 설정 (`TrackPurchase` 영수증 로그만 발송)
-
-### 5. 인앱 결제 (IAP) 연동 대상
-- 사용하는 IAP 플러그인: (예: Unity IAP `IStoreListener`, 커스텀 네이티브 IAP, 기타 에셋)
+### 3. 인앱 결제 (IAP) 연동 대상
+- 사용하는 IAP 플러그인: (예: Unity IAP `IStoreListener`, 자체 결제, 기타 에셋)
 - 결제 완료 콜백이 위치한 클래스/파일: (예: `IAPManager.cs`, `ShopManager.cs`)
 
-### 6. 광고 (Ad) 연동 대상 (광고가 있는 경우)
+### 4. 광고 (Ad) 연동 대상 (광고가 있는 경우)
 - 사용하는 광고 네트워크/미디에이션: (예: AppLovin MAX, IronSource, Google AdMob, Unity Ads, 없음)
 - 하이브로 자사 광고(`HighbrowAd.Show`) 사용 여부: (예: 사용 / 미사용)
 - 광고 콜백이 위치한 클래스/파일: (예: `AdManager.cs`)
 
-### 7. 세션 하트비트 추적 방식
+### 5. 세션 하트비트 추적 방식
 - [ ] **(A) SDK 자동 추적 (기본 권장):** `AutoSessionTracking = true`로 설정하여 백그라운드 5분 주기 자동 전송
 - [ ] **(B) 수동 제어:** 특정 씬(로비 등) 진입 시 `HighbrowLog.StartSessionTracking()` / 로그아웃 시 `StopSessionTracking()` 직접 호출
+
+> **알림:** 신규 유저(New User), 첫 결제(First Purchase), DAU/DADU 지표는 하이브로 중계 수집 서버가 자체 DB를 통해 100% 자동 집계하므로 클라이언트에서 별도로 연동할 필요가 없습니다.
 
 ---
 
@@ -62,7 +56,7 @@
 - 개발자가 질문에 답변하면, 답변을 분석하여:
   1. SDK 초기화 코드 (`HighbrowSDK.Initialize(...)`) 구성 (UseSandbox 설정 포함)
   2. 수정 대상 파일 및 삽입 위치 목록
-  3. `TrackAuth`, `TrackNewUser`(조건부), `TrackPurchase`, `TrackAd`(조건부), `SessionTracking` 적용 계획
+  3. `TrackAuth`, `TrackPurchase`, `TrackAd`, `SessionTracking` 적용 계획
   을 작성해 보여주고, **"이 계획대로 연동을 진행할까요? (Yes / 수정 요청)"**을 물어보세요.
 - 승인을 받은 후에만 `using Highbrow.Core;`, `using Highbrow.Log;`, `using Highbrow.Ad;`를 추가하고 코드를 안전하게 삽입하세요.
 ```

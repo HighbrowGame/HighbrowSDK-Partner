@@ -9,7 +9,7 @@
 1. [🌟 AI 원클릭 연동 가이드 (Master Prompt)](#-ai-원클릭-연동-가이드-master-prompt)
 2. [특징 및 아키텍처 원칙](#-특징-및-아키텍처-원칙)
 3. [설치 가이드 (Unity Package Manager)](#-설치-가이드-unity-package-manager)
-4. [SDK 수동 초기화 및 API 명세](#-sdk-수동-초기화-및-api-명세)
+4. [SDK 수동 초기화 및 4대 핵심 로그 API](#-sdk-수동-초기화-및-4대-핵심-로그-api)
 5. [개별 AI 프롬프트 템플릿 (선택 사항)](#-개별-ai-프롬프트-템플릿-선택-사항)
 6. [확장 모듈 (`Highbrow.Ad`)](#-확장-모듈-highbrowad)
 
@@ -21,7 +21,7 @@
 
 > **사용 방법:**
 > 1. Cursor Composer / GitHub Copilot Chat / Claude에 아래 프롬프트를 전체 복사해 붙여넣습니다.
-> 2. AI가 프로젝트 상황에 대한 **사전 질문(테스트 환경, 신규 유저/첫 결제 판별 가능 여부 등)**을 제시합니다.
+> 2. AI가 프로젝트 상황에 대한 **간단한 사전 질문(발급 AppKey, IAP/광고 파일 위치 등)**을 제시합니다.
 > 3. 답변을 입력하면 AI가 **맞춤형 연동 계획**을 제시하고 승인을 요청합니다.
 > 4. 승인 후 AI가 프로젝트 코드를 안전하게 순차 수정합니다.
 
@@ -52,28 +52,22 @@
 ### 2. 유저 식별자 (SUID) 및 로그인
 - 게임 내 유저 고유 ID(SUID) 변수명 또는 획득 경로: (예: `userSeq`, `FirebaseUser.UserId`, `uuid` 등)
 - 지원하는 소셜/인증 수단: (예: Google, Apple, Guest, Facebook 등)
+- 로그인 성공 콜백이 위치한 클래스/파일: (예: `LoginManager.cs`, `TitleScene.cs`)
 
-### 3. 신규 유저(New User) 판별 가능 여부
-- [ ] **(A) 판별 가능:** 게임 서버 또는 로컬에서 신규 계정/캐릭터 생성 여부를 명확히 알 수 있음 -> `TrackNewUser` 연동
-- [ ] **(B) 판별 불가:** 클라이언트 단에서 신규 여부를 구분하기 어려움 -> `TrackNewUser` 호출 생략 (`TrackAuth`만 연동)
-- [ ] **(C) 로컬 플래그 대체:** PlayerPrefs를 이용해 로컬 첫 실행 여부로 신규 유저 판단 희망
-
-### 4. 첫 결제(First Purchase) 판별 가능 여부
-- [ ] **(A) 판별 가능:** 유저의 생애 첫 인앱 결제 여부를 변수/플래그로 알 수 있음 -> 첫 결제 시 `isFirstPurchase: true` 전달
-- [ ] **(B) 판별 불가:** 첫 결제 여부를 알 수 없음 -> 기본값 `isFirstPurchase: false`로 설정 (`TrackPurchase` 영수증 로그만 발송)
-
-### 5. 인앱 결제 (IAP) 연동 대상
-- 사용하는 IAP 플러그인: (예: Unity IAP `IStoreListener`, 커스텀 네이티브 IAP, 기타 에셋)
+### 3. 인앱 결제 (IAP) 연동 대상
+- 사용하는 IAP 플러그인: (예: Unity IAP `IStoreListener`, 자체 결제, 기타 에셋)
 - 결제 완료 콜백이 위치한 클래스/파일: (예: `IAPManager.cs`, `ShopManager.cs`)
 
-### 6. 광고 (Ad) 연동 대상 (광고가 있는 경우)
+### 4. 광고 (Ad) 연동 대상 (광고가 있는 경우)
 - 사용하는 광고 네트워크/미디에이션: (예: AppLovin MAX, IronSource, Google AdMob, Unity Ads, 없음)
 - 하이브로 자사 광고(`HighbrowAd.Show`) 사용 여부: (예: 사용 / 미사용)
 - 광고 콜백이 위치한 클래스/파일: (예: `AdManager.cs`)
 
-### 7. 세션 하트비트 추적 방식
-- [ ] **(A) SDK 자동 추적 (권장):** `AutoSessionTracking = true`로 설정하여 백그라운드 5분 주기 자동 전송
+### 5. 세션 하트비트 추적 방식
+- [ ] **(A) SDK 자동 추적 (기본 권장):** `AutoSessionTracking = true`로 설정하여 백그라운드 5분 주기 자동 전송
 - [ ] **(B) 수동 제어:** 특정 씬(로비 등) 진입 시 `HighbrowLog.StartSessionTracking()` / 로그아웃 시 `StopSessionTracking()` 직접 호출
+
+> **참고:** 신규 유저 판별, 첫 결제 판별, DAU/DADU 집계는 하이브로 중계 서버가 DB 기반으로 자동 처리하므로 클라이언트에서 별도로 연동할 필요가 없습니다.
 
 ---
 
@@ -83,32 +77,35 @@
 - 개발자가 질문에 답변하면, 답변을 분석하여:
   1. SDK 초기화 코드 (`HighbrowSDK.Initialize(...)`) 구성 (UseSandbox 설정 포함)
   2. 수정 대상 파일 및 삽입 위치 목록
-  3. `TrackAuth`, `TrackNewUser`(조건부), `TrackPurchase`, `TrackAd`(조건부), `SessionTracking` 적용 계획
+  3. `TrackAuth`, `TrackPurchase`, `TrackAd`, `SessionTracking` 적용 계획
   을 작성해 보여주고, **"이 계획대로 연동을 진행할까요? (Yes / 수정 요청)"**을 물어보세요.
-- 승인을 받은 후에만 `using Highbrow.Core;`, `using Highbrow.Log;`를 추가하고 코드를 안전하게 삽입하세요.
+- 승인을 받은 후에만 `using Highbrow.Core;`, `using Highbrow.Log;`, `using Highbrow.Ad;`를 추가하고 코드를 안전하게 삽입하세요.
 ```
 
 ---
 
 ## 🏛 특징 및 아키텍처 원칙
 
-1. **2단계 자동 엔드포인트 라우팅 (Sandbox vs Production):**
+1. **클라이언트 4대 핵심 팩트 로그 모델:**
+   - 클라이언트는 오직 실제 일어난 사실(Fact) 4가지만 전송:
+     1. **`Auth`**: 로그인 인증 성공
+     2. **`Alive`**: 5분 주기 세션 하트비트 (자동)
+     3. **`Purchase`**: 인앱 결제 성공 (영수증)
+     4. **`Advertise`**: 광고 시청
+   - **파생 지표 자동화:** 신규 유저(New User), 첫 결제(First Purchase), 일일 활성 유저(DAU/DADU)는 **하이브로 중계 수집 서버가 자체 유저 DB를 기반으로 100% 무결하게 자동 판별**하여 Snowflake에 적재합니다. (클라이언트 연동 부담 0)
+2. **2단계 자동 엔드포인트 라우팅 (Sandbox vs Production):**
    - `UseSandbox = true` 설정 시 샌드박스 주소(`https://sandbox-log-api.highbrow-inc.com`)로 자동 전송.
    - `UseSandbox = false` (기본값) 설정 시 상용 라이브 주소(`https://log-api.highbrow-inc.com`)로 자동 전송.
-2. **RESTful 엔드포인트 분기 라우팅:**
+3. **RESTful 엔드포인트 라우팅:**
    - 인증: `/v1/log/auth`
-   - 신규 유저: `/v1/log/new-user`
    - 세션 하트비트: `/v1/log/alive`
    - 결제 영수증: `/v1/log/purchase`
-   - 첫 결제: `/v1/log/new-paying`
    - 광고 시청: `/v1/log/ad`
-   - DAU 유저: `/v1/log/dau-suid`
-   - DAU 디바이스: `/v1/log/dau-duid`
-3. **완벽한 디커플링 (Zero Coupling):**
+4. **완벽한 디커플링 (Zero Coupling):**
    - 각 서브 모듈은 독립된 Assembly Definition(`.asmdef`)으로 컴파일되며 상호 참조하지 않습니다.
-4. **오프라인 큐 & 자동 재시도 (PlayerPrefs Retry Queue):**
+5. **오프라인 큐 & 자동 재시도 (PlayerPrefs Retry Queue):**
    - 네트워크 단절 또는 HTTP 오류 시 로그를 로컬 저장소(`PlayerPrefs`)에 FIFO 큐로 캐싱하며, 네트워크 정상화 시 백그라운드에서 자동 재전송합니다.
-5. **공통 메타데이터 자동 주입 (Auto-Injection):**
+6. **공통 메타데이터 자동 주입 (Auto-Injection):**
    - UTC 시각(`Time`), 기기 고유 ID(`Duid`), OS 종류(`Os`), 스토어 마켓(`Market`), 국가 코드(`Country`), 클라이언트 버전(`ClientVersion`), 기기 스펙(`DeviceInfo`)을 SDK 내부에서 자동 수집 및 주입합니다.
 
 ---
@@ -123,7 +120,7 @@ https://github.com/HighbrowGame/HighbrowSDK-Partner.git
 
 ---
 
-## 🚀 SDK 수동 초기화 및 API 명세
+## 🚀 SDK 수동 초기화 및 4대 핵심 로그 API
 
 ### 1. SDK 초기화 예제
 
@@ -142,7 +139,7 @@ public class GameInitializer : MonoBehaviour
             UseSandbox = false,                         // true: 샌드박스 테스트, false: 상용 라이브 배포
             
             EnableLog = true,                           // 로그 모듈 활성화
-            AutoSessionTracking = true,                 // 5분 주기 세션 하트비트 자동 활성화
+            AutoSessionTracking = true,                 // 5분 주기 세션 하트비트(Alive) 자동 활성화
             SessionIntervalSeconds = 300f,              // 세션 로그 주기 (기본 300초 = 5분)
             MaxOfflineQueueSize = 300,                  // 오프라인 캐시 최대 개수
             FlushRetryIntervalSeconds = 30f,            // 오프라인 큐 재전송 주기 (초)
@@ -154,18 +151,14 @@ public class GameInitializer : MonoBehaviour
 }
 ```
 
-### 2. 주요 로그 API 요약
+### 2. 4대 핵심 로그 API 요약
 
-| 로그 종류 | API 메서드 | 파트너사 미지원 시 처리 |
+| 로그 종류 | API 메서드 | 설명 |
 | :--- | :--- | :--- |
-| **인증 로그** | `HighbrowLog.TrackAuth(...)` | **필수 연동** (로그인 완료 시점) |
-| **신규 유저 로그** | `HighbrowLog.TrackNewUser(...)` | 판별 불가능 시 **생략 가능** |
-| **세션 하트비트** | `HighbrowLog.StartSessionTracking()` | `AutoSessionTracking = true` 시 자동 발송 |
-| **결제 영수증 로그** | `HighbrowLog.TrackPurchase(...)` | **필수 연동** (IAP 결제 완료 시점) |
-| **첫 결제 로그** | `HighbrowLog.TrackFirstPurchase(...)` | 판별 불가능 시 `isFirstPurchase: false` 설정 |
-| **광고 시청 로그** | `HighbrowLog.TrackAd(...)` | 게임 내 광고 시청 시 연동 |
-| **DAU 유저 로그** | `HighbrowLog.TrackDailyActiveUserSuid(...)` | 일자 변경 / 마켓 변경 시점 기록 |
-| **DAU 디바이스 로그** | `HighbrowLog.TrackDailyActiveUserDuid(...)` | 일자 변경 시점 기록 |
+| **1. 인증 로그** | `HighbrowLog.TrackAuth(suid, accountId, accountType, nickname);` | 로그인 완료 시점 호출 (신규 유저/DAU 서버 자동 판별) |
+| **2. 세션 하트비트** | `HighbrowLog.StartSessionTracking();` | 5분 주기 자동 발송 (`AutoSessionTracking = true` 시 자동 동작) |
+| **3. 결제 영수증** | `HighbrowLog.TrackPurchase(receiptId, price, priceId, productId, productName);` | IAP 결제 성공 시점 호출 (첫 결제 여부 서버 자동 판별) |
+| **4. 광고 시청** | `HighbrowLog.TrackAd(adType);` | 광고 시청 완료 시점 호출 |
 
 ---
 
@@ -179,7 +172,6 @@ public class GameInitializer : MonoBehaviour
 현재 열려 있는 로그인 관리 스크립트에 `HighbrowSDK`의 인증 로그(`TrackAuth`) 연동 코드를 추가해줘.
 1. 상단에 `using Highbrow.Log;` 추가.
 2. 유저 로그인 성공 콜백에서 `HighbrowLog.TrackAuth(suid, accountId, accountType, nickname, "OK");` 호출.
-3. 신규 유저 판별이 가능한 경우 `HighbrowLog.TrackNewUser();`도 함께 호출. (불가능하면 생략)
 ```
 </details>
 
@@ -190,8 +182,7 @@ public class GameInitializer : MonoBehaviour
 # Instruction
 현재 열려 있는 IAP 관리 스크립트에 `HighbrowSDK` 결제 영수증 로그(`TrackPurchase`)를 연동해줘.
 1. 상단에 `using Highbrow.Log;` 추가.
-2. 결제 완료 시점에 `HighbrowLog.TrackPurchase(receiptId, price, priceId, productId, productName, isFirstPurchase: isFirst);` 호출.
-3. 첫 결제 여부를 모르는 경우 `isFirstPurchase: false`로 전달.
+2. 결제 완료 시점에 `HighbrowLog.TrackPurchase(receiptId, price, priceId, productId, productName);` 호출.
 ```
 </details>
 

@@ -6,7 +6,8 @@ namespace Highbrow.Log
 {
     /// <summary>
     /// Static convenience facade for Highbrow.Log module.
-    /// Provides simple, direct access to tracking APIs across game scripts.
+    /// Provides simple, direct access to the 4 core tracking APIs (Auth, Alive, Purchase, Advertise).
+    /// All derived metrics (New User, First Purchase, DAU/DADU) are processed automatically by the Highbrow Collector backend.
     /// </summary>
     public static class HighbrowLog
     {
@@ -29,6 +30,7 @@ namespace Highbrow.Log
 
         /// <summary>
         /// Tracks user authentication / login completion.
+        /// Backend automatically derives New User and DAU metrics.
         /// </summary>
         public static void TrackAuth(string suid, string accountId, AccountType accountType, string nickname, string result = "OK", string ipAddress = null)
         {
@@ -36,15 +38,25 @@ namespace Highbrow.Log
         }
 
         /// <summary>
-        /// Tracks new user / character creation.
+        /// Tracks in-app purchase store receipt.
+        /// Backend automatically derives First Purchase (New Paying) metrics.
         /// </summary>
-        public static void TrackNewUser(string suid = null, AccountType? accountType = null)
+        public static void TrackPurchase(string receiptId, float price, string priceId, int productId, string productName, DateTime? purchaseTime = null, string suid = null)
         {
-            Manager.TrackNewUser(suid, accountType);
+            Manager.TrackPurchase(receiptId, price, priceId, productId, productName, purchaseTime, suid);
+        }
+
+        /// <summary>
+        /// Tracks advertisement view event.
+        /// </summary>
+        public static void TrackAd(AdType adType, string customAdTypeName = null, string suid = null)
+        {
+            Manager.TrackAd(adType, customAdTypeName, suid);
         }
 
         /// <summary>
         /// Starts periodic session heartbeat tracking (default: 5 minutes / 300 seconds).
+        /// Automatically enabled if AutoSessionTracking = true in HighbrowConfig.
         /// </summary>
         public static void StartSessionTracking(float intervalSeconds = 300f)
         {
@@ -57,46 +69,6 @@ namespace Highbrow.Log
         public static void StopSessionTracking()
         {
             Manager.StopSessionTracking();
-        }
-
-        /// <summary>
-        /// Tracks in-app purchase store receipt.
-        /// </summary>
-        public static void TrackPurchase(string receiptId, float price, string priceId, int productId, string productName, DateTime? purchaseTime = null, bool isFirstPurchase = false, string suid = null)
-        {
-            Manager.TrackPurchase(receiptId, price, priceId, productId, productName, purchaseTime, isFirstPurchase, suid);
-        }
-
-        /// <summary>
-        /// Tracks first purchase log when an account makes their very first IAP purchase.
-        /// </summary>
-        public static void TrackFirstPurchase(int productId, DateTime? purchaseTime = null, string suid = null)
-        {
-            Manager.TrackFirstPurchase(productId, purchaseTime, suid);
-        }
-
-        /// <summary>
-        /// Tracks advertisement view lifecycle.
-        /// </summary>
-        public static void TrackAd(AdType adType, bool isComplete = true, bool userAdSkipPackage = false, string customAdTypeName = null, string suid = null)
-        {
-            Manager.TrackAd(adType, isComplete, userAdSkipPackage, customAdTypeName, suid);
-        }
-
-        /// <summary>
-        /// Tracks daily active unique user (DAU SUID) log recorded on daily date transition or market change.
-        /// </summary>
-        public static void TrackDailyActiveUserSuid(DateTime lastActiveTime, DateTime? userCreateTime = null, string suid = null)
-        {
-            Manager.TrackDailyActiveUserSuid(lastActiveTime, userCreateTime, suid);
-        }
-
-        /// <summary>
-        /// Tracks daily active unique device (DAU DUID) log recorded on daily date transition.
-        /// </summary>
-        public static void TrackDailyActiveUserDuid(DateTime? userCreateTime = null, bool? isNewDuid = null, string duid = null)
-        {
-            Manager.TrackDailyActiveUserDuid(userCreateTime, isNewDuid, duid);
         }
 
         /// <summary>

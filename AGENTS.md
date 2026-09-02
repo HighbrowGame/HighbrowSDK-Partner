@@ -15,6 +15,9 @@ This guide instructs AI coding agents (Cursor, Copilot, Claude, Windsurf, etc.) 
    - Insert only the required `HighbrowLog.Track...()` or `HighbrowAd.Show(...)` calls at the exact completion/success points.
 3. **Decoupled Modules:**
    - The Log module does NOT depend on Ad. Use `HighbrowLog` directly.
+4. **4 Core Fact Logs Only:**
+   - Client only emits 4 core fact logs: `Auth`, `Alive` (Auto), `Purchase`, `Advertise`.
+   - **Do NOT implement New User, First Purchase, or DAU tracking logic in the client.** The Highbrow Collector backend automatically derives these metrics from its state DB.
 
 ---
 
@@ -32,7 +35,7 @@ HighbrowConfig config = new HighbrowConfig
     UseSandbox = false,                 // true: Sandbox/DEV collector, false: Production collector
     Region = "kr",                     // "kr", "us", "dev", "qa", etc.
     EnableLog = true,
-    AutoSessionTracking = true,        // Automatically sends 5-min heartbeat
+    AutoSessionTracking = true,        // Automatically sends 5-min heartbeat (Alive)
     SessionIntervalSeconds = 300f,
     DebugMode = false                  // Set false in production
 };
@@ -42,7 +45,7 @@ HighbrowSDK.Initialize(config);
 
 ---
 
-## 3. Public API Reference & Integration Rules
+## 3. Public API Reference (4 Core Fact Logs)
 
 ### 1) Authentication & Login (`TrackAuth`)
 - **Call Location:** Immediately after user login success (Google, Apple, Guest, Facebook, etc.).
@@ -57,11 +60,9 @@ HighbrowSDK.Initialize(config);
       string ipAddress = null       // Optional IP string
   );
   ```
-- **Gotcha (New User):**
-  - If the game can determine if this is a new user/character: call `HighbrowLog.TrackNewUser(suid, accountType);` right after `TrackAuth`.
-  - If the game **cannot** determine new user status: **SKIP** `TrackNewUser`. Do not invent speculative logic.
+- **Backend Auto-Derivation:** The server automatically records `NewUserLog` if this is the user's first login. No client check needed.
 
-### 2) Session Tracking (`SessionTracking`)
+### 2) Session Tracking (`SessionTracking` / `Alive`)
 - If `config.AutoSessionTracking = true` was set in `Initialize()`, session heartbeat (every 5 mins) runs **automatically** in the background. No manual call needed.
 - If manual control is required:
   ```csharp
@@ -80,13 +81,10 @@ HighbrowSDK.Initialize(config);
       int productId,                // Internal numeric product ID
       string productName,           // Product display name
       DateTime? purchaseTime = null,// Null defaults to DateTime.UtcNow
-      bool isFirstPurchase = false, // True only if verified first purchase
       string suid = null            // Optional SUID override
   );
   ```
-- **Gotcha (First Purchase):**
-  - If the game tracks first purchase state: pass `isFirstPurchase: true`.
-  - If the game **cannot** determine first purchase: pass `isFirstPurchase: false` (the backend will compute new paying status).
+- **Backend Auto-Derivation:** The server automatically records `NewPayingLog` (first purchase) if the user has 0 previous purchase history in DB.
 
 ### 4) Advertisements (`TrackAd`)
 - **Call Location:** In the ad mediation callbacks (AppLovin MAX, IronSource, AdMob, etc.).
@@ -111,10 +109,6 @@ HighbrowSDK.Initialize(config);
       }
   );
   ```
-
-### 6) Daily Active User (DAU) Tracking
-- **DAU SUID:** `HighbrowLog.TrackDailyActiveUserSuid(lastActiveTime, userCreateTime);`
-- **DAU DUID:** `HighbrowLog.TrackDailyActiveUserDuid(userCreateTime, isNewDuid);`
 
 ---
 

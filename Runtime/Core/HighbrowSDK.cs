@@ -64,7 +64,7 @@ namespace Highbrow.Core
             // Ensure lifecycle dispatcher is active
             HighbrowDispatcher.EnsureCreated();
 
-            HighbrowLogger.Log($"Initializing Highbrow SDK Core v{SdkVersion} (Sandbox: {config.UseSandbox}, Market: {config.Market}, AppKey: {config.AppKey})");
+            HighbrowLogger.Log($"Initializing Highbrow SDK Core v{SdkVersion} (Sandbox: {config.UseSandbox}, Market: {config.Market}, AppKey: {MaskKey(config.AppKey)})");
 
             // Initialize registered modules
             foreach (var kvp in registeredModules)
@@ -147,6 +147,13 @@ namespace Highbrow.Core
             registeredModules.Clear();
             activeConfig = null;
             isInitialized = false;
+        }
+
+        private static string MaskKey(string key)
+        {
+            if (string.IsNullOrEmpty(key)) return "[EMPTY]";
+            if (key.Length <= 6) return "***";
+            return key.Substring(0, 3) + "***" + key.Substring(key.Length - 3);
         }
     }
 }

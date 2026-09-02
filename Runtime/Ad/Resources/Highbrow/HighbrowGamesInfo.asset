@@ -22,17 +22,19 @@ MonoBehaviour:
       zhcn: "\u9F99\u6751 3"
       zhtw: "\u9F8D\u6751 3"
     Desc:
-      ko: "\uB4DC\uB798\uACE4\uBE4C\uB9AC\uC9C0\uC758 \uC0C8\uB85C\uC6B4 \uBAA8\uD5D8\uC774 \uC2DC\uC791\uB429\uB2C8\uB2E4!"
-      en: A new adventure of Dragon Village begins!
-      ja: "\u30C9\u30E9\u30B4\u30F3\u30D3\u30EC\u30C3\u30B8\u306E\u65B0\u3057\u3044\u5192\u967A\u304C\u59CB\u307E\u308A\u307E\u3059\uFF01"
-      zhcn: "\u9F99\u6751\u7684\u5168\u65B0\u5192\u9669\u5F00\u59CB\u4E86\uFF01"
-      zhtw: "\u9F8D\u6751\u7684\u5168\u65B0\u5192\u96AA\u958B\u59CB\u4E86\uFF01"
-    PlaystoreId: com.highbrow.games.dv3
-    AppstoreId: 6740000000
-    AppIcon: {fileID: 21300000, guid: 74d4b0b6134c54360bdb470e213b97a0, type: 3}
-    Video: {fileID: 32900000, guid: 334b2655b5a8a47c4813e8f0c2ecee79, type: 3}
+      ko: "\uB4DC\uB798\uACE4 \uC218\uC9D1, \uAD50\uBC30, RPG, \uC2E4\uC2DC\uAC04 \uC804\uB7B5 PVP!"
+      en: Pixel Dragon Collect Breed RPG
+      ja: "\u30C9\u30C3\u30C8\u7D75\u30C9\u30E9\u30B4\u30F3\u53CE\u96C6\u80B2\u6210RPG"
+      zhcn: "\u50CF\u7D20\u9F99\u6536\u96C6\u517B\u6210RPG"
+      zhtw: "\u50CF\u7D20\u9F8D\u6536\u96C6\u990A\u6210RPG"
+    PlaystoreId: com.highbrow.games.dvo
+    AppstoreId: 6499562253
+    OnestoreId: 0001005299
+    CustomStoreUrl:
+    AppIcon: {fileID: 21300000, guid: b4e4944ea5154b50899f748c409abed4, type: 3}
+    Video: {fileID: 32900000, guid: eadde2769ac4492796911081fc33a026, type: 3}
     VideoUrl: 
-    Portion: 3
+    Portion: 7
   - GameCode: dvc
     Enable: 1
     Name:
@@ -49,8 +51,10 @@ MonoBehaviour:
       zhtw: "\u6536\u96C6\uFF01\u5B75\u5316\uFF01\u548C\u7E41\u6B96\uFF01"
     PlaystoreId: com.highbrow.games.dv
     AppstoreId: 6444795301
+    OnestoreId:
+    CustomStoreUrl:
     AppIcon: {fileID: 21300000, guid: 74d4b0b6134c54360bdb470e213b97a0, type: 3}
     Video: {fileID: 32900000, guid: 334b2655b5a8a47c4813e8f0c2ecee79, type: 3}
     VideoUrl: 
     Portion: 3
-  Version: 26.08.31
+  Version: 26.09.02

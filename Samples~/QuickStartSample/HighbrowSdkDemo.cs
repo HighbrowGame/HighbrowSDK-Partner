@@ -1,4 +1,5 @@
 using System;
+using Highbrow.Ad;
 using Highbrow.Core;
 using Highbrow.Log;
 using UnityEngine;
@@ -92,6 +93,21 @@ namespace Highbrow.Samples
         public void OnAdViewed(AdType adType)
         {
             HighbrowLog.TrackAd(adType);
+        }
+
+        // 4. Called to display Highbrow in-house cross-promotion house ad
+        public void ShowCrossPromotionAd()
+        {
+            HighbrowAd.Show(
+                onCompleted: () =>
+                {
+                    Debug.Log("[HighbrowSdkDemo] Cross-promotion ad completed or closed.");
+                },
+                onFailed: () =>
+                {
+                    Debug.LogWarning("[HighbrowSdkDemo] Cross-promotion ad failed to show.");
+                }
+            );
         }
     }
 }

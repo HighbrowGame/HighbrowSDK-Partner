@@ -75,7 +75,7 @@ namespace Highbrow.Log
             }
 
             config = sdkConfig ?? new HighbrowConfig();
-            httpClient = new HighbrowHttpClient();
+            httpClient = new HighbrowHttpClient(dumpHttpPayload: config.DumpHttpPayload);
             offlineQueue = new HighbrowOfflineQueue(config.MaxOfflineQueueSize);
 
             IsInitialized = true;

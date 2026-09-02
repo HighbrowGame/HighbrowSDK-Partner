@@ -92,6 +92,12 @@ namespace Highbrow.Core
         public bool DebugMode = false;
 
         /// <summary>
+        /// When DebugMode is enabled, dumps HTTP request and response headers and payloads to the Unity console.
+        /// Contains sensitive values and must remain disabled outside local debugging.
+        /// </summary>
+        public bool DumpHttpPayload = false;
+
+        /// <summary>
         /// Custom Country code override (2-letter ISO, e.g., "KR", "US").
         /// If null or empty, detected from system/region.
         /// </summary>

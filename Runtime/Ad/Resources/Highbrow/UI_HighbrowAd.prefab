@@ -2205,7 +2205,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 2932637063423976491}
-        m_TargetAssemblyTypeName: Highbrow.HighbrowAdPlayer, Assembly-CSharp
+        m_TargetAssemblyTypeName: Highbrow.Ad.HighbrowAdPlayer, Highbrow.Ad
         m_MethodName: SetMute
         m_Mode: 6
         m_Arguments:
@@ -2289,7 +2289,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 2932637063423976491}
-        m_TargetAssemblyTypeName: Highbrow.HighbrowAdPlayer, Assembly-CSharp
+        m_TargetAssemblyTypeName: Highbrow.Ad.HighbrowAdPlayer, Highbrow.Ad
         m_MethodName: SetMute
         m_Mode: 6
         m_Arguments:
@@ -2305,7 +2305,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 2932637063423976491}
-        m_TargetAssemblyTypeName: Highbrow.HighbrowAdPlayer, Assembly-CSharp
+        m_TargetAssemblyTypeName: Highbrow.Ad.HighbrowAdPlayer, Highbrow.Ad
         m_MethodName: SetMute
         m_Mode: 6
         m_Arguments:
@@ -3279,7 +3279,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 2932637063423976491}
-        m_TargetAssemblyTypeName: Highbrow.HighbrowAdPlayer, Assembly-CSharp
+        m_TargetAssemblyTypeName: Highbrow.Ad.HighbrowAdPlayer, Highbrow.Ad
         m_MethodName: PlayVideo
         m_Mode: 1
         m_Arguments:
@@ -3295,7 +3295,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 2932637063423976491}
-        m_TargetAssemblyTypeName: Highbrow.HighbrowAdPlayer, Assembly-CSharp
+        m_TargetAssemblyTypeName: Highbrow.Ad.HighbrowAdPlayer, Highbrow.Ad
         m_MethodName: PauseVideo
         m_Mode: 1
         m_Arguments:
@@ -3428,7 +3428,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 8463602212869636582}
-        m_TargetAssemblyTypeName: Highbrow.UI.HbrwUISlider, Assembly-CSharp
+        m_TargetAssemblyTypeName: Highbrow.UI.HbrwUISlider, Highbrow.Ad
         m_MethodName: ResetPosition
         m_Mode: 6
         m_Arguments:
@@ -3440,7 +3440,7 @@ MonoBehaviour:
           m_BoolArgument: 1
         m_CallState: 2
       - m_Target: {fileID: 8463602212869636582}
-        m_TargetAssemblyTypeName: Highbrow.UI.HbrwUISlider, Assembly-CSharp
+        m_TargetAssemblyTypeName: Highbrow.UI.HbrwUISlider, Highbrow.Ad
         m_MethodName: Move
         m_Mode: 1
         m_Arguments:

@@ -14,10 +14,12 @@ namespace Highbrow.Core.Network
     public class HighbrowHttpClient
     {
         private readonly int timeoutSeconds;
+        private readonly bool dumpHttpPayload;
 
-        public HighbrowHttpClient(int timeoutSeconds = 10)
+        public HighbrowHttpClient(int timeoutSeconds = 10, bool dumpHttpPayload = false)
         {
             this.timeoutSeconds = timeoutSeconds;
+            this.dumpHttpPayload = dumpHttpPayload;
         }
 
         /// <summary>
@@ -72,6 +74,10 @@ namespace Highbrow.Core.Network
                 request.SetRequestHeader("X-SDK-Version", HighbrowSDK.SdkVersion);
 
                 HighbrowLogger.Log($"Sending [{logType}] request to {endpointUrl} (Bytes: {bodyRaw.Length})");
+                if (ShouldDumpHttpPayload)
+                {
+                    LogRequestDump(endpointUrl, appKey, logType, jsonPayload);
+                }
 
                 yield return request.SendWebRequest();
 
@@ -80,6 +86,11 @@ namespace Highbrow.Core.Network
 #else
                 bool isSuccess = !request.isNetworkError && !request.isHttpError;
 #endif
+
+                if (ShouldDumpHttpPayload)
+                {
+                    LogResponseDump(request);
+                }
 
                 if (isSuccess)
                 {
@@ -94,6 +105,45 @@ namespace Highbrow.Core.Network
                     onComplete?.Invoke(false, errorMsg);
                 }
             }
+        }
+
+        private bool ShouldDumpHttpPayload => dumpHttpPayload && HighbrowLogger.DebugMode;
+
+        private static void LogRequestDump(string endpointUrl, string appKey, string logType, string jsonPayload)
+        {
+            StringBuilder dump = new StringBuilder();
+            dump.AppendLine($"\n[HighbrowSDK HTTP DUMP] ---> POST {endpointUrl}");
+            dump.AppendLine("[Request Headers]");
+            dump.AppendLine("  Content-Type: application/json; charset=utf-8");
+            dump.AppendLine("  Accept: application/json");
+            if (!string.IsNullOrEmpty(appKey)) dump.AppendLine($"  X-App-Key: {appKey}");
+            if (!string.IsNullOrEmpty(logType)) dump.AppendLine($"  X-Log-Type: {logType}");
+            dump.AppendLine($"  X-SDK-Version: {HighbrowSDK.SdkVersion}");
+            dump.AppendLine("[Request Body (JSON)]");
+            dump.AppendLine(jsonPayload);
+            dump.AppendLine("--------------------------------------------------");
+            HighbrowLogger.Log(dump.ToString());
+        }
+
+        private static void LogResponseDump(UnityWebRequest request)
+        {
+            StringBuilder dump = new StringBuilder();
+            dump.AppendLine($"[HighbrowSDK HTTP DUMP] <--- HTTP {request.responseCode} {request.error}");
+            dump.AppendLine("[Response Headers]");
+
+            var responseHeaders = request.GetResponseHeaders();
+            if (responseHeaders != null)
+            {
+                foreach (var header in responseHeaders)
+                {
+                    dump.AppendLine($"  {header.Key}: {header.Value}");
+                }
+            }
+
+            dump.AppendLine("[Response Body]");
+            dump.AppendLine(request.downloadHandler?.text ?? string.Empty);
+            dump.AppendLine("--------------------------------------------------");
+            HighbrowLogger.Log(dump.ToString());
         }
     }
 }

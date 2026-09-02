@@ -1,14 +1,14 @@
 using System;
 using System.Collections;
-using System.Reflection;
 using Highbrow.Core.Utils;
 using Highbrow.Log;
+using Highbrow.UI;
 using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
 using UnityEngine.Video;
 
-namespace Highbrow
+namespace Highbrow.Ad
 {
     [Serializable]
     public class InfoPanel
@@ -53,10 +53,17 @@ namespace Highbrow
 
         // -------------------------------------------------
         private Action onAdEndCallback = null;
+        private Action onAdFailedCallback = null;
         private GameMarketInfo _currentGameInfo = null;
         private InfoPanel _currentInfoPanel = null;
         private static int _totalPlayCount = 0;
-        private bool isCompleted = false;
+        private bool _isFailed = false;
+        private bool _hasPlaybackStarted = false;
+
+        /// <summary>
+        /// Indicates whether initialization or required component validation failed.
+        /// </summary>
+        public bool IsFailed => _isFailed;
 
         private const float STD_RESOLUTION_RATIO = 19f / 9f;
         private const float ADD_SEC_PER_PLAY = 10.0f;
@@ -80,6 +87,7 @@ namespace Highbrow
             if (!ValidateAssignedFields())
             {
                 HighbrowLogger.LogError("[HighbrowAdPlayer] Critical fields missing. Destroying player instance.");
+                _isFailed = true;
                 Destroy(gameObject);
                 return;
             }
@@ -92,13 +100,27 @@ namespace Highbrow
 
         void OnDestroy()
         {
-            try
+            if (AdsVideoPlayer != null)
             {
-                onAdEndCallback?.Invoke();
+                try
+                {
+                    if (AdsVideoPlayer.isPlaying)
+                        AdsVideoPlayer.Stop();
+                }
+                catch { }
             }
-            catch (Exception ex)
+
+            // Only invoke completion callback if playback actually started without failure
+            if (!_isFailed && _hasPlaybackStarted)
             {
-                HighbrowLogger.LogError($"[HighbrowAdPlayer] Error invoking onAdEndCallback: {ex.Message}");
+                try
+                {
+                    onAdEndCallback?.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    HighbrowLogger.LogError($"[HighbrowAdPlayer] Error invoking onAdEndCallback: {ex.Message}");
+                }
             }
         }
 
@@ -115,11 +137,7 @@ namespace Highbrow
                 SkipText.text = $"{AdSkipSec:0}s";
             _totalPlayCount++;
 
-            // Track Ad start log
-            HighbrowLog.TrackAd(AdType.CrossPromotion);
-
             StartCoroutine(PrepareVideo());
-            StartCoroutine(WaitForAd());
         }
 
         /// <summary>
@@ -128,6 +146,14 @@ namespace Highbrow
         public void SetOnAdEnd(Action callback)
         {
             onAdEndCallback = callback;
+        }
+
+        /// <summary>
+        /// Registers callback invoked when ad presentation fails.
+        /// </summary>
+        public void SetOnAdFailed(Action callback)
+        {
+            onAdFailedCallback = callback;
         }
 
         /// <summary>
@@ -189,15 +215,17 @@ namespace Highbrow
 
             GameObject instance = Instantiate(prefab, canvas.transform);
             HighbrowAdPlayer player = instance.GetComponent<HighbrowAdPlayer>();
-            if (player == null)
+            if (player == null || player.IsFailed)
             {
-                HighbrowLogger.LogError("[HighbrowAdPlayer] Instantiated prefab is missing HighbrowAdPlayer component.");
-                Destroy(instance);
+                HighbrowLogger.LogError("[HighbrowAdPlayer] Instantiated prefab is missing HighbrowAdPlayer component or critical fields.");
+                if (instance != null)
+                    Destroy(instance);
                 onFailed?.Invoke();
                 return null;
             }
 
             player.SetOnAdEnd(onCompleted);
+            player.SetOnAdFailed(onFailed);
             player.PlayAd();
             return player;
         }
@@ -215,7 +243,7 @@ namespace Highbrow
 
             bool isOverStdRatio = CheckResolutionIfOverStdRatio();
             ApplyProperScreenPos(isOverStdRatio);
-            SetSkipButton();
+            InitButtonListeners();
 
             if (AdsVideoPlayer != null)
             {
@@ -267,7 +295,7 @@ namespace Highbrow
             _currentInfoPanel = isOverStdRatio ? SideInfoPanel : BottomInfoPanel;
         }
 
-        private void SetSkipButton()
+        private void InitButtonListeners()
         {
             if (SkipBtn != null)
             {
@@ -275,14 +303,49 @@ namespace Highbrow
                 SkipBtn.onClick.AddListener(OnCloseClicked);
                 SkipBtn.enabled = false;
             }
+
+            // Fallback listener for PauseBtn if HbrwToggleButton is not attached
+            if (PauseBtn != null && PauseBtn.GetComponent<Highbrow.UI.HbrwToggleButton>() == null)
+            {
+                PauseBtn.onClick.RemoveAllListeners();
+                PauseBtn.onClick.AddListener(() =>
+                {
+                    if (AdsVideoPlayer != null && AdsVideoPlayer.isPlaying)
+                        PauseVideo();
+                    else
+                        PlayVideo();
+                });
+            }
+
+            // Fallback listener for SoundBtn if HbrwToggleButton is not attached
+            if (SoundBtn != null && SoundBtn.GetComponent<Highbrow.UI.HbrwToggleButton>() == null)
+            {
+                bool isMuted = false;
+                SoundBtn.onClick.RemoveAllListeners();
+                SoundBtn.onClick.AddListener(() =>
+                {
+                    isMuted = !isMuted;
+                    SetMute(isMuted);
+                });
+            }
         }
 
         private void OnCloseClicked()
         {
-            if (!isCompleted)
+            Destroy(gameObject);
+        }
+
+        private void HandlePreparationFailed(string reason)
+        {
+            HighbrowLogger.LogWarning($"[HighbrowAdPlayer] {reason}. Closing ad.");
+            _isFailed = true;
+            try
             {
-                isCompleted = true;
-                HighbrowLog.TrackAd(AdType.CrossPromotion);
+                onAdFailedCallback?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                HighbrowLogger.LogError($"[HighbrowAdPlayer] Error invoking onAdFailedCallback: {ex.Message}");
             }
             Destroy(gameObject);
         }
@@ -298,10 +361,13 @@ namespace Highbrow
 
             if (_currentGameInfo == null)
             {
-                HighbrowLogger.LogWarning("[HighbrowAdPlayer] No active GameMarketInfo available. Closing ad.");
-                Destroy(gameObject);
+                HandlePreparationFailed("No active GameMarketInfo available");
                 yield break;
             }
+
+            // 비디오 준비 전 이전 프레임 잔상이 깜빡이지 않도록 화면을 임시 투명화
+            if (VideoScreen != null)
+                VideoScreen.color = Color.clear;
 
             ApplyGameInfo(_currentGameInfo);
 
@@ -309,18 +375,43 @@ namespace Highbrow
             {
                 if (AdsVideoPlayer.clip == null && string.IsNullOrEmpty(AdsVideoPlayer.url))
                 {
-                    HighbrowLogger.LogWarning("[HighbrowAdPlayer] No video clip or URL assigned for ad. Closing.");
-                    Destroy(gameObject);
+                    HandlePreparationFailed("No video clip or URL assigned for ad");
                     yield break;
                 }
 
+                bool hasError = false;
+                VideoPlayer.ErrorEventHandler onError = (source, message) =>
+                {
+                    HighbrowLogger.LogWarning($"[HighbrowAdPlayer] VideoPlayer error during preparation: {message}");
+                    hasError = true;
+                };
+                AdsVideoPlayer.errorReceived += onError;
+
                 AdsVideoPlayer.Prepare();
-                while (!AdsVideoPlayer.isPrepared)
+
+                float elapsed = 0f;
+                const float PREPARE_TIMEOUT = 8.0f;
+                while (!AdsVideoPlayer.isPrepared && !hasError && elapsed < PREPARE_TIMEOUT)
                 {
                     yield return new WaitForSeconds(0.2f);
+                    elapsed += 0.2f;
                 }
 
+                AdsVideoPlayer.errorReceived -= onError;
+
+                if (!AdsVideoPlayer.isPrepared || hasError)
+                {
+                    HandlePreparationFailed($"Failed to prepare video (error: {hasError}, timeout: {elapsed >= PREPARE_TIMEOUT})");
+                    yield break;
+                }
+
+                if (VideoScreen != null)
+                    VideoScreen.color = Color.white;
+
+                _hasPlaybackStarted = true;
+                HighbrowLog.TrackAd(AdType.CrossPromotion);
                 PlayVideo();
+                StartCoroutine(WaitForAd());
             }
 
             if (_currentInfoPanel?.Slider != null)
@@ -410,8 +501,20 @@ namespace Highbrow
 
         public void SetMute(bool mute)
         {
-            if (AdsVideoPlayer != null && AdsVideoPlayer.canSetDirectAudioVolume)
+            if (AdsVideoPlayer == null) return;
+
+            if (AdsVideoPlayer.canSetDirectAudioVolume)
+            {
                 AdsVideoPlayer.SetDirectAudioMute(0, mute);
+            }
+            else
+            {
+                var audioSource = AdsVideoPlayer.GetTargetAudioSource(0);
+                if (audioSource != null)
+                {
+                    audioSource.mute = mute;
+                }
+            }
         }
 
         #endregion
@@ -446,27 +549,27 @@ namespace Highbrow
 
         private bool ValidateAssignedFields()
         {
-            FieldInfo[] fields = GetType().GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            foreach (FieldInfo field in fields)
+            if (AdsVideoPlayer == null)
             {
-                if (field.IsDefined(typeof(SerializeField), true))
-                {
-                    object val = field.GetValue(this);
-                    if (val == null)
-                    {
-                        HighbrowLogger.LogWarning($"[HighbrowAdPlayer] Field '{field.Name}' is not assigned in inspector.");
-                    }
-                }
+                HighbrowLogger.LogError("[HighbrowAdPlayer] VideoPlayer component is missing.");
+                return false;
+            }
+            if (VideoScreen == null)
+            {
+                HighbrowLogger.LogError("[HighbrowAdPlayer] VideoScreen (RawImage) component is missing.");
+                return false;
+            }
+            if (HbrwGamesInfo == null)
+            {
+                HighbrowLogger.LogError($"[HighbrowAdPlayer] HighbrowGamesInfo asset not found at Resources: {GAMES_INFO_RESOURCE_PATH}");
+                return false;
             }
             return true;
         }
 
         #endregion
     }
-}
 
-namespace Highbrow.Ad
-{
     /// <summary>
     /// Static facade providing one-line access to show Highbrow house ads.
     /// </summary>

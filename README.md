@@ -162,7 +162,8 @@ public class GameInitializer : MonoBehaviour
             SessionIntervalSeconds = 120f,              // 세션 로그 주기 (기본 120초 = 2분)
             MaxOfflineQueueSize = 300,                  // 오프라인 캐시 최대 개수
             FlushRetryIntervalSeconds = 30f,            // 오프라인 큐 재전송 주기 (초)
-            DebugMode = false                           // 상용 배포 시 false 지정
+            DebugMode = false,                          // 상용 배포 시 false 지정
+            DumpHttpPayload = false                     // DebugMode와 함께 true일 때만 요청/응답 전문 출력
         };
 
         HighbrowSDK.Initialize(config);

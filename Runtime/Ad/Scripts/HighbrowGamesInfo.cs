@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Highbrow.Core;
 using UnityEngine;
 using UnityEngine.Video;
 
-namespace Highbrow
+namespace Highbrow.Ad
 {
     [Serializable]
     public class SimpleMultiLangString
@@ -38,6 +39,8 @@ namespace Highbrow
         public SimpleMultiLangString Desc = new SimpleMultiLangString();
         public string PlaystoreId = string.Empty;
         public string AppstoreId = string.Empty;
+        public string OnestoreId = string.Empty;
+        public string CustomStoreUrl = string.Empty;
         public Sprite AppIcon;
         public VideoClip Video;
         public string VideoUrl = string.Empty;
@@ -45,13 +48,28 @@ namespace Highbrow
 
         public string GetStoreLink()
         {
+            if (!string.IsNullOrEmpty(CustomStoreUrl))
+            {
+                return CustomStoreUrl;
+            }
+
+            var market = HighbrowSDK.Config?.Market ?? MarketType.None;
+            if (market == MarketType.OneStore)
+            {
+                if (!string.IsNullOrEmpty(OnestoreId))
+                {
+                    return $"https://m.onestore.co.kr/v2/ko-kr/app/{OnestoreId}?scYn=Y";
+                }
+                return !string.IsNullOrEmpty(PlaystoreId) ? $"https://play.google.com/store/apps/details?id={PlaystoreId}" : string.Empty;
+            }
+
             if (Application.platform == RuntimePlatform.Android)
             {
-                return $"https://play.google.com/store/apps/details?id={PlaystoreId}";
+                return !string.IsNullOrEmpty(PlaystoreId) ? $"https://play.google.com/store/apps/details?id={PlaystoreId}" : string.Empty;
             }
             else
             {
-                return $"https://apps.apple.com/app/id{AppstoreId}";
+                return !string.IsNullOrEmpty(AppstoreId) ? $"https://apps.apple.com/app/id{AppstoreId}" : string.Empty;
             }
         }
     }

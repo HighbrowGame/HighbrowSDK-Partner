@@ -3,7 +3,7 @@ using System;
 namespace Highbrow.Log
 {
     /// <summary>
-    /// User session heartbeat log recorded periodically (every 5 minutes) while active.
+    /// User session heartbeat log recorded periodically (every 2 minutes) while active.
     /// Emits client runtime facts. Server DB injects UserCreateTime upon Snowflake ingestion.
     /// </summary>
     [Serializable]

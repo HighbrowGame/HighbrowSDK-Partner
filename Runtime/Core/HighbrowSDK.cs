@@ -11,9 +11,16 @@ namespace Highbrow.Core
     /// </summary>
     public static class HighbrowSDK
     {
+        public const string SdkVersion = "1.1.2";
+
         private static readonly Dictionary<Type, IHighbrowModule> registeredModules = new Dictionary<Type, IHighbrowModule>();
         private static HighbrowConfig activeConfig;
         private static bool isInitialized;
+
+        /// <summary>
+        /// Gets the current SDK package version.
+        /// </summary>
+        public static string Version => SdkVersion;
 
         /// <summary>
         /// Gets whether the Highbrow SDK core has been initialized.
@@ -57,7 +64,7 @@ namespace Highbrow.Core
             // Ensure lifecycle dispatcher is active
             HighbrowDispatcher.EnsureCreated();
 
-            HighbrowLogger.Log($"Initializing Highbrow SDK Core v1.0.0 (Mode: {config.ServerMode}, Region: {config.Region})");
+            HighbrowLogger.Log($"Initializing Highbrow SDK Core v{SdkVersion} (Sandbox: {config.UseSandbox}, Market: {config.Market}, AppKey: {config.AppKey})");
 
             // Initialize registered modules
             foreach (var kvp in registeredModules)

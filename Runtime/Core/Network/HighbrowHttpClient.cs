@@ -62,7 +62,7 @@ namespace Highbrow.Core.Network
                     request.SetRequestHeader("X-Log-Type", logType);
                 }
 
-                request.SetRequestHeader("X-SDK-Version", "1.0.0");
+                request.SetRequestHeader("X-SDK-Version", HighbrowSDK.SdkVersion);
 
                 HighbrowLogger.Log($"Sending [{logType}] request to {endpointUrl} (Bytes: {bodyRaw.Length})");
 

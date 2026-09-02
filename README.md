@@ -64,10 +64,12 @@
 - 광고 콜백이 위치한 클래스/파일: (예: `AdManager.cs`)
 
 ### 5. 세션 하트비트 추적 방식
-- [ ] **(A) SDK 자동 추적 (기본 권장):** `AutoSessionTracking = true`로 설정하여 백그라운드 5분 주기 자동 전송
+- [ ] **(A) SDK 자동 추적 (기본 권장):** `AutoSessionTracking = true`로 설정 (유저 `TrackAuth` 성공 1초 후부터 백그라운드 2분 주기 자동 전송 시작)
 - [ ] **(B) 수동 제어:** 특정 씬(로비 등) 진입 시 `HighbrowLog.StartSessionTracking()` / 로그아웃 시 `StopSessionTracking()` 직접 호출
 
-> **참고:** 신규 유저 판별, 첫 결제 판별, DAU/DADU 집계는 하이브로 중계 서버가 DB 기반으로 자동 처리하므로 클라이언트에서 별도로 연동할 필요가 없습니다.
+> **알림:**
+> 1. `TrackAuth`에서 입력된 `SUID`, `AccountId`, `AccountType`, `DUID`는 SDK 내부에 자동 캐싱되므로, 이후 결제(`TrackPurchase`), 광고(`TrackAd`), 세션(`Alive`)에서 개발자가 ID를 다시 전달할 필요가 없습니다.
+> 2. 신규 유저(New User), 첫 결제(First Purchase), DAU/DADU 지표는 하이브로 중계 수집 서버가 자체 DB를 통해 100% 자동 집계하므로 클라이언트에서 별도로 연동할 필요가 없습니다.
 
 ---
 
@@ -75,10 +77,11 @@
 
 - **사전 질문 응답을 받기 전까지는 절대 프로젝트 파일을 수정하지 마세요.**
 - 개발자가 질문에 답변하면, 답변을 분석하여:
-  1. SDK 초기화 코드 (`HighbrowSDK.Initialize(...)`) 구성 (UseSandbox 설정 포함)
+  1. SDK 초기화 코드 (`HighbrowSDK.Initialize(...)`) 구성 (UseSandbox 설정 및 프로젝트 내 원스토어/구글 등 빌드 심볼을 고려한 `config.Market` 동적 분기 코드 포함)
   2. 수정 대상 파일 및 삽입 위치 목록
   3. `TrackAuth`, `TrackPurchase`, `TrackAd`, `SessionTracking` 적용 계획
   을 작성해 보여주고, **"이 계획대로 연동을 진행할까요? (Yes / 수정 요청)"**을 물어보세요.
+- 국가 코드(Country)는 디바이스 Locale에서 SDK가 자동 추출하므로 개발자에게 입력을 요구하지 마세요.
 - 승인을 받은 후에만 `using Highbrow.Core;`, `using Highbrow.Log;`, `using Highbrow.Ad;`를 추가하고 코드를 안전하게 삽입하세요.
 ```
 
@@ -88,10 +91,10 @@
 
 1. **클라이언트 4대 핵심 팩트 로그 모델:**
    - 클라이언트는 오직 실제 일어난 사실(Fact) 4가지만 전송:
-     1. **`Auth`**: 로그인 인증 성공
-     2. **`Alive`**: 5분 주기 세션 하트비트 (자동)
-     3. **`Purchase`**: 인앱 결제 성공 (영수증)
-     4. **`Advertise`**: 광고 시청
+     1. **`Auth`**: 로그인 인증 성공 (ID 4종 자동 캐싱 & 1초 후 Alive 시작)
+     2. **`Alive`**: 2분 주기 세션 하트비트 (TrackAuth 1초 후 자동 동작)
+     3. **`Purchase`**: 인앱 결제 성공 (캐시된 SUID/DUID 자동 주입)
+     4. **`Advertise`**: 광고 시청 (캐시된 SUID 자동 주입)
    - **파생 지표 자동화:** 신규 유저(New User), 첫 결제(First Purchase), 일일 활성 유저(DAU/DADU)는 **하이브로 중계 수집 서버가 자체 유저 DB를 기반으로 100% 무결하게 자동 판별**하여 Snowflake에 적재합니다. (클라이언트 연동 부담 0)
 2. **2단계 자동 엔드포인트 라우팅 (Sandbox vs Production):**
    - `UseSandbox = true` 설정 시 샌드박스 주소(`https://sandbox-log-api.highbrow-inc.com`)로 자동 전송.
@@ -187,7 +190,7 @@ public class GameInitializer : MonoBehaviour
 # Instruction
 현재 열려 있는 로그인 관리 스크립트에 `HighbrowSDK`의 인증 로그(`TrackAuth`) 연동 코드를 추가해줘.
 1. 상단에 `using Highbrow.Log;` 추가.
-2. 유저 로그인 성공 콜백에서 `HighbrowLog.TrackAuth(suid, accountId, accountType, nickname, "OK");` 호출.
+2. 유저 로그인 성공 콜백에서 `HighbrowLog.TrackAuth(suid, accountId, accountType, nickname, result: "OK");` 호출.
 ```
 </details>
 

@@ -11,7 +11,7 @@ namespace Highbrow.Log
     /// <summary>
     /// Core Log Module Manager for Highbrow SDK.
     /// Handles the 4 core fact logs (Auth, Alive, Purchase, Advertise), environment auto-injection,
-    /// 5-minute session heartbeat coroutines, UnityWebRequest transmission, and offline PlayerPrefs retry caching.
+    /// 2-minute session heartbeat coroutines, UnityWebRequest transmission, and offline PlayerPrefs retry caching.
     /// Derived metrics (New User, First Purchase, DAU) are processed automatically by the Highbrow Collector backend.
     /// </summary>
     public class HighbrowLogManager : IHighbrowModule

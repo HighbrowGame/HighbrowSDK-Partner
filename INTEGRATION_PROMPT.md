@@ -43,10 +43,12 @@
 - 광고 콜백이 위치한 클래스/파일: (예: `AdManager.cs`)
 
 ### 5. 세션 하트비트 추적 방식
-- [ ] **(A) SDK 자동 추적 (기본 권장):** `AutoSessionTracking = true`로 설정하여 백그라운드 2분 주기 자동 전송
+- [ ] **(A) SDK 자동 추적 (기본 권장):** `AutoSessionTracking = true`로 설정 (유저 `TrackAuth` 성공 3초 후부터 백그라운드 2분 주기 자동 전송 시작)
 - [ ] **(B) 수동 제어:** 특정 씬(로비 등) 진입 시 `HighbrowLog.StartSessionTracking()` / 로그아웃 시 `StopSessionTracking()` 직접 호출
 
-> **알림:** 신규 유저(New User), 첫 결제(First Purchase), DAU/DADU 지표는 하이브로 중계 수집 서버가 자체 DB를 통해 100% 자동 집계하므로 클라이언트에서 별도로 연동할 필요가 없습니다.
+> **알림:** 
+> 1. `TrackAuth`에서 입력된 `SUID`, `AccountId`, `AccountType`, `DUID`는 SDK 내부에 자동 캐싱되므로, 이후 결제(`TrackPurchase`), 광고(`TrackAd`), 세션(`Alive`)에서 개발자가 ID를 다시 전달할 필요가 없습니다.
+> 2. 신규 유저(New User), 첫 결제(First Purchase), DAU/DADU 지표는 하이브로 중계 수집 서버가 자체 DB를 통해 100% 자동 집계하므로 클라이언트에서 별도로 연동할 필요가 없습니다.
 
 ---
 

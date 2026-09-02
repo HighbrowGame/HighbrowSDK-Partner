@@ -21,20 +21,29 @@ namespace Highbrow.Log
         public static HighbrowLogManager Manager => HighbrowLogManager.Instance;
 
         /// <summary>
-        /// Registers or updates current user context.
+        /// Registers or updates current user context (SUID, AccountID, AccountType, DUID).
         /// </summary>
-        public static void SetUserInfo(string suid, string accountId = null, AccountType accountType = AccountType.None)
+        public static void SetUserInfo(string suid, string accountId = null, AccountType accountType = AccountType.None, string duid = null)
         {
-            Manager.SetUserInfo(suid, accountId, accountType);
+            Manager.SetUserInfo(suid, accountId, accountType, duid);
+        }
+
+        /// <summary>
+        /// Clears active user context and stops session heartbeat tracking on user logout.
+        /// </summary>
+        public static void ClearUser()
+        {
+            Manager.ClearUser();
         }
 
         /// <summary>
         /// Tracks user authentication / login completion.
-        /// Backend automatically derives New User and DAU metrics.
+        /// Caches SUID, AccountID, AccountType, and DUID for subsequent purchase, ad, and alive logs.
+        /// Automatically triggers session alive heartbeat shortly after Auth when AutoSessionTracking is enabled.
         /// </summary>
-        public static void TrackAuth(string suid, string accountId, AccountType accountType, string nickname, string result = "OK", string ipAddress = null)
+        public static void TrackAuth(string suid, string accountId, AccountType accountType, string nickname, string duid = null, string result = "OK", string ipAddress = null)
         {
-            Manager.TrackAuth(suid, accountId, accountType, nickname, result, ipAddress);
+            Manager.TrackAuth(suid, accountId, accountType, nickname, duid, result, ipAddress);
         }
 
         /// <summary>

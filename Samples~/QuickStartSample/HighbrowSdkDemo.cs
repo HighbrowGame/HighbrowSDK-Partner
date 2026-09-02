@@ -55,15 +55,24 @@ namespace Highbrow.Samples
         }
 
         // 1. Called on user login success (Google, Apple, Guest, etc.)
-        public void OnUserLoginSuccess(string suid, string accountId, AccountType accountType, string nickname)
+        public void OnUserLoginSuccess(string suid, string accountId, AccountType accountType, string nickname, string duid = null)
         {
+            // Caches SUID, AccountID, AccountType, and DUID.
+            // Automatically starts 2-min Alive session heartbeat 3 seconds after Auth.
             HighbrowLog.TrackAuth(
                 suid: suid,
                 accountId: accountId,
                 accountType: accountType,
                 nickname: nickname,
+                duid: duid, // Optional: defaults to SystemInfo.deviceUniqueIdentifier
                 result: "OK"
             );
+        }
+
+        // Called on user logout / account switch
+        public void OnUserLogout()
+        {
+            HighbrowLog.ClearUser(); // Stops Alive session heartbeat and clears cached IDs
         }
 
         // 2. Called on in-app purchase success (Unity IAP ProcessPurchase, etc.)

@@ -171,10 +171,10 @@ public class GameInitializer : MonoBehaviour
 
 | 로그 종류 | API 메서드 | 설명 |
 | :--- | :--- | :--- |
-| **1. 인증 로그** | `HighbrowLog.TrackAuth(suid, accountId, accountType, nickname);` | 로그인 완료 시점 호출 (신규 유저/DAU 서버 자동 판별) |
-| **2. 세션 하트비트** | `HighbrowLog.StartSessionTracking();` | 2분 주기 자동 발송 (`AutoSessionTracking = true` 시 자동 동작) |
-| **3. 결제 영수증** | `HighbrowLog.TrackPurchase(receiptId, price, priceId, productId, productName);` | IAP 결제 성공 시점 호출 (첫 결제 여부 서버 자동 판별) |
-| **4. 광고 시청** | `HighbrowLog.TrackAd(adType);` | 광고 시청 완료 시점 호출 |
+| **1. 인증 로그** | `HighbrowLog.TrackAuth(suid, accountId, accountType, nickname, duid);` | 로그인 완료 시점 호출 (ID 4종 자동 캐싱 & 3초 후 2분 주기 Alive 자동 시작) |
+| **2. 세션 하트비트** | `HighbrowLog.StartSessionTracking();` | 2분 주기 자동 발송 (`AutoSessionTracking = true` 시 TrackAuth 직후 자동 실행) |
+| **3. 결제 영수증** | `HighbrowLog.TrackPurchase(receiptId, price, priceId, productId, productName);` | IAP 결제 성공 시점 호출 (캐시된 SUID/DUID 자동 주입) |
+| **4. 광고 시청** | `HighbrowLog.TrackAd(adType);` | 광고 시청 완료 시점 호출 (캐시된 SUID 자동 주입) |
 
 ---
 

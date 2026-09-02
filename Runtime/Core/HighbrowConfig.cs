@@ -92,11 +92,6 @@ namespace Highbrow.Core
         public bool DebugMode = false;
 
         /// <summary>
-        /// Custom DUID override. If null or empty, SystemInfo.deviceUniqueIdentifier is used.
-        /// </summary>
-        public string CustomDuid = null;
-
-        /// <summary>
         /// Custom Country code override (2-letter ISO, e.g., "KR", "US").
         /// If null or empty, detected from system/region.
         /// </summary>

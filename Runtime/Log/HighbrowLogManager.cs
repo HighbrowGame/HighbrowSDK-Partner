@@ -52,10 +52,12 @@ namespace Highbrow.Log
         private string currentSuid;
         private string currentAccountId;
         private AccountType currentAccountType = AccountType.None;
+        private string currentDuid;
 
         public string CurrentSuid => currentSuid;
         public string CurrentAccountId => currentAccountId;
         public AccountType CurrentAccountType => currentAccountType;
+        public string CurrentDuid => currentDuid;
 
         public HighbrowLogManager()
         {
@@ -85,11 +87,8 @@ namespace Highbrow.Log
                 flushRetryCoroutine = HighbrowDispatcher.Instance.RunCoroutine(PeriodicFlushCoroutine());
             }
 
-            // Start auto session tracking if configured
-            if (config.AutoSessionTracking)
-            {
-                StartSessionTracking(config.SessionIntervalSeconds);
-            }
+            // Note: Per Haegin requirements, session heartbeat (Alive) is NOT started at Initialize().
+            // It automatically starts shortly after successful TrackAuth() when AutoSessionTracking is enabled.
 
             // Hook application pause/quit events
             HighbrowDispatcher.OnPauseStateChanged += HandlePauseStateChanged;
@@ -123,15 +122,29 @@ namespace Highbrow.Log
         #region User Context Configuration
 
         /// <summary>
-        /// Registers or updates the active user context for subsequent log emissions.
+        /// Registers or updates the active user context (SUID, AccountID, AccountType, DUID) for subsequent log emissions.
         /// </summary>
-        public void SetUserInfo(string suid, string accountId = null, AccountType accountType = AccountType.None)
+        public void SetUserInfo(string suid, string accountId = null, AccountType accountType = AccountType.None, string duid = null)
         {
             currentSuid = suid;
             if (!string.IsNullOrEmpty(accountId)) currentAccountId = accountId;
             if (accountType != AccountType.None) currentAccountType = accountType;
+            if (!string.IsNullOrEmpty(duid)) currentDuid = duid;
+            else if (string.IsNullOrEmpty(currentDuid)) currentDuid = HighbrowContext.GetDuid();
 
-            HighbrowLogger.Log($"User context updated: SUID={suid}, AccountID={accountId}, AccountType={accountType}");
+            HighbrowLogger.Log($"User context updated: SUID={suid}, AccountID={accountId}, AccountType={accountType}, DUID={currentDuid}");
+        }
+
+        /// <summary>
+        /// Clears active user context and stops alive session tracking. Call on logout / account switch.
+        /// </summary>
+        public void ClearUser()
+        {
+            StopSessionTracking();
+            currentSuid = null;
+            currentAccountId = null;
+            currentAccountType = AccountType.None;
+            HighbrowLogger.Log("User context cleared.");
         }
 
         #endregion
@@ -140,17 +153,19 @@ namespace Highbrow.Log
 
         /// <summary>
         /// Tracks user authentication / login completion.
-        /// Backend automatically derives New User and DAU metrics based on SUID/DUID state DB.
+        /// Caches SUID, AccountID, AccountType, and DUID for subsequent purchase, ad, and alive logs.
+        /// (Haegin requirement: Automatically triggers session alive heartbeat shortly after Auth).
         /// </summary>
         /// <param name="suid">User unique ID.</param>
         /// <param name="accountId">Platform account ID (e.g. Google sub, Apple user identifier).</param>
         /// <param name="accountType">Account type enum.</param>
         /// <param name="nickname">User nickname.</param>
+        /// <param name="duid">Optional custom device unique ID (null defaults to device unique ID).</param>
         /// <param name="result">Authentication result (Default: "OK").</param>
         /// <param name="ipAddress">Optional user IP address.</param>
-        public void TrackAuth(string suid, string accountId, AccountType accountType, string nickname, string result = "OK", string ipAddress = null)
+        public void TrackAuth(string suid, string accountId, AccountType accountType, string nickname, string duid = null, string result = "OK", string ipAddress = null)
         {
-            SetUserInfo(suid, accountId, accountType);
+            SetUserInfo(suid, accountId, accountType, duid);
 
             AuthLog log = new AuthLog
             {
@@ -158,7 +173,7 @@ namespace Highbrow.Log
                 AccountType = (int)accountType,
                 AccountId = accountId ?? string.Empty,
                 Suid = ResolveSuid(suid),
-                Duid = HighbrowContext.GetDuid(config?.CustomDuid),
+                Duid = ResolveDuid(),
                 Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
                 Os = HighbrowContext.GetOsType(),
                 Country = HighbrowContext.GetCountry(config?.CustomCountry),
@@ -169,6 +184,12 @@ namespace Highbrow.Log
             };
 
             SendLog(PathLogAuth, "LogAuth", JsonUtility.ToJson(log));
+
+            // Haegin requirement: Start Alive session tracking shortly after successful Auth
+            if (config != null && config.AutoSessionTracking)
+            {
+                StartSessionTrackingWithDelay(3f, config.SessionIntervalSeconds > 0 ? config.SessionIntervalSeconds : 120f);
+            }
         }
 
         #endregion
@@ -244,15 +265,26 @@ namespace Highbrow.Log
         #region 4. Alive (Session Heartbeat Tracking)
 
         /// <summary>
+        /// Starts periodic session heartbeat tracking with optional initial delay.
+        /// (Haegin requirement: Starts shortly after Auth completion).
+        /// </summary>
+        /// <param name="initialDelaySeconds">Delay in seconds before the first heartbeat ping.</param>
+        /// <param name="intervalSeconds">Interval between subsequent heartbeats in seconds (Default: 120s).</param>
+        public void StartSessionTrackingWithDelay(float initialDelaySeconds, float intervalSeconds = 120f)
+        {
+            StopSessionTracking();
+
+            HighbrowLogger.Log($"Starting session tracking coroutine (Delay: {initialDelaySeconds}s, Interval: {intervalSeconds}s)");
+            sessionCoroutine = HighbrowDispatcher.Instance.RunCoroutine(SessionTrackingDelayedRoutine(initialDelaySeconds, intervalSeconds));
+        }
+
+        /// <summary>
         /// Starts periodic session heartbeat tracking (default: 2 minutes = 120 seconds).
         /// </summary>
         /// <param name="intervalSeconds">Interval between heartbeats in seconds.</param>
         public void StartSessionTracking(float intervalSeconds = 120f)
         {
-            StopSessionTracking();
-
-            HighbrowLogger.Log($"Starting session tracking coroutine (Interval: {intervalSeconds}s)");
-            sessionCoroutine = HighbrowDispatcher.Instance.RunCoroutine(SessionTrackingRoutine(intervalSeconds));
+            StartSessionTrackingWithDelay(0f, intervalSeconds);
         }
 
         /// <summary>
@@ -268,8 +300,13 @@ namespace Highbrow.Log
             }
         }
 
-        private IEnumerator SessionTrackingRoutine(float intervalSeconds)
+        private IEnumerator SessionTrackingDelayedRoutine(float initialDelaySeconds, float intervalSeconds)
         {
+            if (initialDelaySeconds > 0)
+            {
+                yield return new WaitForSecondsRealtime(initialDelaySeconds);
+            }
+
             // Initial session ping
             SendUserSessionLog();
 
@@ -287,7 +324,7 @@ namespace Highbrow.Log
                 Time = HighbrowContext.GetUtcNowIsoString(),
                 AccountType = (int)currentAccountType,
                 Suid = ResolveSuid(null),
-                Duid = HighbrowContext.GetDuid(config?.CustomDuid),
+                Duid = ResolveDuid(),
                 Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
                 Os = HighbrowContext.GetOsType(),
                 Country = HighbrowContext.GetCountry(config?.CustomCountry)
@@ -462,6 +499,17 @@ namespace Highbrow.Log
                 return explicitSuid;
             }
             return !string.IsNullOrEmpty(currentSuid) ? currentSuid : string.Empty;
+        }
+
+        private string ResolveDuid()
+        {
+            if (!string.IsNullOrEmpty(currentDuid))
+            {
+                return currentDuid;
+            }
+
+            currentDuid = HighbrowContext.GetDuid();
+            return currentDuid;
         }
 
         private void HandlePauseStateChanged(bool isPaused)

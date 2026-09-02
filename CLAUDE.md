@@ -20,6 +20,7 @@ HighbrowSDK.Initialize(new HighbrowConfig
 {
     AppKey = "YOUR_APP_KEY",
     Market = targetMarket, // Dynamically resolved store (OneStore, GooglePlay, AppleStore, etc.)
+    ClientVersion = Application.version, // Optional: defaults to Application.version
     UseSandbox = false, // true for dev/test, false for production
     EnableLog = true,
     AutoSessionTracking = true // 5-minute session heartbeat (Alive) starts automatically

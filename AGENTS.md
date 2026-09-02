@@ -47,6 +47,7 @@ HighbrowConfig config = new HighbrowConfig
 {
     AppKey = "PARTNER_APP_KEY",         // Issued by Highbrow
     Market = targetMarket,              // Dynamically resolved store
+    ClientVersion = Application.version,// Optional: defaults to Application.version
     UseSandbox = false,                 // true: Sandbox/DEV collector, false: Production collector
     Region = "kr",                     // "kr", "us", "dev", "qa", etc.
     EnableLog = true,

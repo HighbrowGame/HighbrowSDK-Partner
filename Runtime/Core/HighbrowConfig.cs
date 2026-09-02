@@ -115,9 +115,19 @@ namespace Highbrow.Core
         public int? CustomMarket = null;
 
         /// <summary>
-        /// Custom client version override. If null or empty, Application.version is used.
+        /// Game client application version string (e.g. "1.0.0", "1.2.34").
+        /// If null or empty, Application.version is automatically used.
         /// </summary>
-        public string CustomClientVersion = null;
+        public string ClientVersion = null;
+
+        /// <summary>
+        /// Legacy alias for ClientVersion.
+        /// </summary>
+        public string CustomClientVersion
+        {
+            get => ClientVersion;
+            set => ClientVersion = value;
+        }
 
         /// <summary>
         /// Resolves active log collector base URL based on UseSandbox, CustomLogBaseUrl, or CustomLogEndpointUrl.

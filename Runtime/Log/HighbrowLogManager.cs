@@ -204,7 +204,7 @@ namespace Highbrow.Log
                 ProductId = productId,
                 ProductName = productName ?? string.Empty,
                 PurchaseTime = HighbrowContext.FormatUtcIsoString(pTime),
-                ClientVersion = HighbrowContext.GetClientVersion(config?.CustomClientVersion),
+                ClientVersion = HighbrowContext.GetClientVersion(config?.ClientVersion),
                 DeviceInfo = HighbrowContext.GetDeviceInfo()
             };
 

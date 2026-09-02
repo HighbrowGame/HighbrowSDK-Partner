@@ -151,6 +151,7 @@ public class GameInitializer : MonoBehaviour
         {
             AppKey = "YOUR_ISSUED_HIGHBROW_APP_KEY",   // 하이브로 발급 앱 키
             Market = targetMarket,                      // 동적으로 감지된 타겟 마켓 지정
+            ClientVersion = Application.version,        // 클라이언트 앱 버전 (null 시 Application.version 자동 사용)
             UseSandbox = false,                         // true: 샌드박스 테스트, false: 상용 라이브 배포
             
             EnableLog = true,                           // 로그 모듈 활성화

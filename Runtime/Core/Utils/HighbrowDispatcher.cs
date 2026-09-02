@@ -20,6 +20,11 @@ namespace Highbrow.Core.Utils
         public static event Action<bool> OnPauseStateChanged;
         public static event Action OnQuitTriggered;
 
+        /// <summary>
+        /// Gets whether Unity application shutdown has started.
+        /// </summary>
+        public static bool IsQuitting => isQuitting;
+
         public static HighbrowDispatcher Instance
         {
             get

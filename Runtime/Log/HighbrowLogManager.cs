@@ -339,9 +339,9 @@ namespace Highbrow.Log
 
         private void SendLog(string logPath, string logType, string jsonPayload)
         {
-            if (!IsInitialized || httpClient == null)
+            if (!IsInitialized || httpClient == null || HighbrowDispatcher.IsQuitting)
             {
-                HighbrowLogger.LogWarning($"SDK not initialized. Caching [{logPath}] into offline queue.");
+                HighbrowLogger.Log($"SDK unavailable for transmission. Caching [{logPath}] into offline queue.");
                 offlineQueue?.Enqueue(logPath, jsonPayload);
                 return;
             }
@@ -524,7 +524,7 @@ namespace Highbrow.Log
 
         private void HandleApplicationQuit()
         {
-            HighbrowLogger.Log("App quitting. Flushing pending offline logs.");
+            HighbrowLogger.Log("App quitting. Caching final session heartbeat.");
             SendUserSessionLog();
         }
 

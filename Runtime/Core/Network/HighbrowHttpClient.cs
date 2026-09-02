@@ -36,7 +36,14 @@ namespace Highbrow.Core.Network
                 return;
             }
 
-            HighbrowDispatcher.Instance.RunCoroutine(PostJsonCoroutine(endpointUrl, appKey, logType, jsonPayload, onComplete));
+            HighbrowDispatcher dispatcher = HighbrowDispatcher.Instance;
+            if (dispatcher == null)
+            {
+                onComplete?.Invoke(false, "Dispatcher is unavailable.");
+                return;
+            }
+
+            dispatcher.RunCoroutine(PostJsonCoroutine(endpointUrl, appKey, logType, jsonPayload, onComplete));
         }
 
         private IEnumerator PostJsonCoroutine(string endpointUrl, string appKey, string logType, string jsonPayload, Action<bool, string> onComplete)

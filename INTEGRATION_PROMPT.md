@@ -51,7 +51,7 @@
 - 광고 콜백이 위치한 클래스/파일: (예: `AdManager.cs`)
 
 ### 7. 세션 하트비트 추적 방식
-- [ ] **(A) SDK 자동 추적 (권장):** `AutoSessionTracking = true`로 설정하여 백그라운드 5분 주기 자동 전송
+- [ ] **(A) SDK 자동 추적 (기본 권장):** `AutoSessionTracking = true`로 설정하여 백그라운드 5분 주기 자동 전송
 - [ ] **(B) 수동 제어:** 특정 씬(로비 등) 진입 시 `HighbrowLog.StartSessionTracking()` / 로그아웃 시 `StopSessionTracking()` 직접 호출
 
 ---

@@ -116,7 +116,7 @@ namespace Highbrow
             _totalPlayCount++;
 
             // Track Ad start log
-            HighbrowLog.TrackAd(AdType.CrossPromotion, isComplete: false);
+            HighbrowLog.TrackAd(AdType.CrossPromotion);
 
             StartCoroutine(PrepareVideo());
             StartCoroutine(WaitForAd());
@@ -282,7 +282,7 @@ namespace Highbrow
             if (!isCompleted)
             {
                 isCompleted = true;
-                HighbrowLog.TrackAd(AdType.CrossPromotion, isComplete: true);
+                HighbrowLog.TrackAd(AdType.CrossPromotion);
             }
             Destroy(gameObject);
         }

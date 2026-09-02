@@ -132,7 +132,7 @@ namespace Highbrow.Log
             if (!string.IsNullOrEmpty(duid)) currentDuid = duid;
             else if (string.IsNullOrEmpty(currentDuid)) currentDuid = HighbrowContext.GetDuid();
 
-            HighbrowLogger.Log($"User context updated: SUID={suid}, AccountID={accountId}, AccountType={accountType}, DUID={currentDuid}");
+            HighbrowLogger.Log($"User context updated: SUID={MaskIdentifier(suid)}, AccountID={MaskIdentifier(accountId)}, AccountType={accountType}, DUID={MaskIdentifier(currentDuid)}");
         }
 
         /// <summary>
@@ -526,6 +526,13 @@ namespace Highbrow.Log
         {
             HighbrowLogger.Log("App quitting. Flushing pending offline logs.");
             SendUserSessionLog();
+        }
+
+        private static string MaskIdentifier(string val)
+        {
+            if (string.IsNullOrEmpty(val)) return "[EMPTY]";
+            if (val.Length <= 4) return "***";
+            return val.Substring(0, 2) + "***" + val.Substring(val.Length - 2);
         }
 
         #endregion

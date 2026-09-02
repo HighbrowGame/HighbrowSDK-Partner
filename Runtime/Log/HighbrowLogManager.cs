@@ -52,7 +52,6 @@ namespace Highbrow.Log
         private string currentSuid;
         private string currentAccountId;
         private AccountType currentAccountType = AccountType.None;
-        private DateTime? userCreateTimeUtc;
 
         public string CurrentSuid => currentSuid;
         public string CurrentAccountId => currentAccountId;
@@ -126,12 +125,11 @@ namespace Highbrow.Log
         /// <summary>
         /// Registers or updates the active user context for subsequent log emissions.
         /// </summary>
-        public void SetUserInfo(string suid, string accountId = null, AccountType accountType = AccountType.None, DateTime? userCreateTime = null)
+        public void SetUserInfo(string suid, string accountId = null, AccountType accountType = AccountType.None)
         {
             currentSuid = suid;
             if (!string.IsNullOrEmpty(accountId)) currentAccountId = accountId;
             if (accountType != AccountType.None) currentAccountType = accountType;
-            if (userCreateTime.HasValue) userCreateTimeUtc = userCreateTime.Value;
 
             HighbrowLogger.Log($"User context updated: SUID={suid}, AccountID={accountId}, AccountType={accountType}");
         }
@@ -284,8 +282,6 @@ namespace Highbrow.Log
 
         private void SendUserSessionLog()
         {
-            DateTime createTime = userCreateTimeUtc ?? DateTime.UtcNow;
-
             UserSessionLog log = new UserSessionLog
             {
                 Time = HighbrowContext.GetUtcNowIsoString(),
@@ -294,8 +290,7 @@ namespace Highbrow.Log
                 Duid = HighbrowContext.GetDuid(config?.CustomDuid),
                 Market = HighbrowContext.GetMarketType(config?.CustomMarket),
                 Os = HighbrowContext.GetOsType(),
-                Country = HighbrowContext.GetCountry(config?.CustomCountry),
-                UserCreateTime = HighbrowContext.FormatUtcIsoString(createTime)
+                Country = HighbrowContext.GetCountry(config?.CustomCountry)
             };
 
             SendLog(PathLogAlive, "LogAlive", JsonUtility.ToJson(log));

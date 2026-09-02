@@ -23,9 +23,9 @@ namespace Highbrow.Log
         /// <summary>
         /// Registers or updates current user context.
         /// </summary>
-        public static void SetUserInfo(string suid, string accountId = null, AccountType accountType = AccountType.None, DateTime? userCreateTime = null)
+        public static void SetUserInfo(string suid, string accountId = null, AccountType accountType = AccountType.None)
         {
-            Manager.SetUserInfo(suid, accountId, accountType, userCreateTime);
+            Manager.SetUserInfo(suid, accountId, accountType);
         }
 
         /// <summary>

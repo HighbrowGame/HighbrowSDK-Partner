@@ -4,7 +4,7 @@ namespace Highbrow.Log
 {
     /// <summary>
     /// User session heartbeat log recorded periodically (every 5 minutes) while active.
-    /// JSON Keys match Snowflake USER_SESSION log schema.
+    /// Emits client runtime facts. Server DB injects UserCreateTime upon Snowflake ingestion.
     /// </summary>
     [Serializable]
     public class UserSessionLog
@@ -16,6 +16,5 @@ namespace Highbrow.Log
         public int Market;
         public int Os;
         public string Country;
-        public string UserCreateTime;
     }
 }

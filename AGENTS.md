@@ -79,11 +79,11 @@ HighbrowSDK.Initialize(config);
   ```
 - **Automatic Caching & Session Trigger:**
   - Caches `suid`, `accountId`, `accountType`, and `duid` in memory so subsequent purchase, ad, and session logs automatically reuse them.
-  - If `config.AutoSessionTracking = true`, automatically triggers the 2-minute session heartbeat (`Alive`) 3 seconds after `TrackAuth`.
+  - If `config.AutoSessionTracking = true`, automatically triggers the 2-minute session heartbeat (`Alive`) 1 second after `TrackAuth`.
 - **Backend Auto-Derivation:** The server automatically records `NewUserLog` if this is the user's first login. No client check needed.
 
 ### 2) Session Tracking (`SessionTracking` / `Alive`)
-- Starts **automatically** 3 seconds after successful `TrackAuth` if `config.AutoSessionTracking = true` was set. No manual call needed.
+- Starts **automatically** 1 second after successful `TrackAuth` if `config.AutoSessionTracking = true` was set. No manual call needed.
 - If manual control or logout handling is required:
   ```csharp
   HighbrowLog.StartSessionTracking(120f); // Start 2-min periodic heartbeat

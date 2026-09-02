@@ -188,7 +188,7 @@ namespace Highbrow.Log
             // Haegin requirement: Start Alive session tracking shortly after successful Auth
             if (config != null && config.AutoSessionTracking)
             {
-                StartSessionTrackingWithDelay(3f, config.SessionIntervalSeconds > 0 ? config.SessionIntervalSeconds : 120f);
+                StartSessionTrackingWithDelay(1f, config.SessionIntervalSeconds > 0 ? config.SessionIntervalSeconds : 120f);
             }
         }
 

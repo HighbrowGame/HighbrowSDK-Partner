@@ -58,7 +58,7 @@ namespace Highbrow.Samples
         public void OnUserLoginSuccess(string suid, string accountId, AccountType accountType, string nickname, string duid = null)
         {
             // Caches SUID, AccountID, AccountType, and DUID.
-            // Automatically starts 2-min Alive session heartbeat 3 seconds after Auth.
+            // Automatically starts 2-min Alive session heartbeat 1 second after Auth.
             HighbrowLog.TrackAuth(
                 suid: suid,
                 accountId: accountId,

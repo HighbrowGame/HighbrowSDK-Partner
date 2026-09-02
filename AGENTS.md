@@ -51,8 +51,8 @@ HighbrowConfig config = new HighbrowConfig
     UseSandbox = false,                 // true: Sandbox/DEV collector, false: Production collector
     Region = "kr",                     // "kr", "us", "dev", "qa", etc.
     EnableLog = true,
-    AutoSessionTracking = true,        // Automatically sends 5-min heartbeat (Alive)
-    SessionIntervalSeconds = 300f,
+    AutoSessionTracking = true,        // Automatically sends 2-min heartbeat (Alive)
+    SessionIntervalSeconds = 120f,
     DebugMode = false                  // Set false in production
 };
 
@@ -79,10 +79,10 @@ HighbrowSDK.Initialize(config);
 - **Backend Auto-Derivation:** The server automatically records `NewUserLog` if this is the user's first login. No client check needed.
 
 ### 2) Session Tracking (`SessionTracking` / `Alive`)
-- If `config.AutoSessionTracking = true` was set in `Initialize()`, session heartbeat (every 5 mins) runs **automatically** in the background. No manual call needed.
+- If `config.AutoSessionTracking = true` was set in `Initialize()`, session heartbeat (every 2 mins) runs **automatically** in the background. No manual call needed.
 - If manual control is required:
   ```csharp
-  HighbrowLog.StartSessionTracking(300f); // Start 5-min periodic heartbeat
+  HighbrowLog.StartSessionTracking(120f); // Start 2-min periodic heartbeat
   HighbrowLog.StopSessionTracking();      // Stop on logout / title return
   ```
 

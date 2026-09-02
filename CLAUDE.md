@@ -23,7 +23,7 @@ HighbrowSDK.Initialize(new HighbrowConfig
     ClientVersion = Application.version, // Optional: defaults to Application.version
     UseSandbox = false, // true for dev/test, false for production
     EnableLog = true,
-    AutoSessionTracking = true // 5-minute session heartbeat (Alive) starts automatically
+    AutoSessionTracking = true // 2-minute session heartbeat (Alive) starts automatically
 });
 ```
 

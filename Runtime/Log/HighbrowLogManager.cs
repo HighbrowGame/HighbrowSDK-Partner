@@ -244,10 +244,10 @@ namespace Highbrow.Log
         #region 4. Alive (Session Heartbeat Tracking)
 
         /// <summary>
-        /// Starts periodic session heartbeat tracking (default: 5 minutes = 300 seconds).
+        /// Starts periodic session heartbeat tracking (default: 2 minutes = 120 seconds).
         /// </summary>
         /// <param name="intervalSeconds">Interval between heartbeats in seconds.</param>
-        public void StartSessionTracking(float intervalSeconds = 300f)
+        public void StartSessionTracking(float intervalSeconds = 120f)
         {
             StopSessionTracking();
 

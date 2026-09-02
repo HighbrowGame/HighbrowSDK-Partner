@@ -67,14 +67,14 @@ namespace Highbrow.Core
         public bool EnableAd = true;
 
         /// <summary>
-        /// Whether to automatically start 5-minute alive/session tracking when Log module is initialized.
+        /// Whether to automatically start 2-minute alive/session tracking when Log module is initialized.
         /// </summary>
         public bool AutoSessionTracking = true;
 
         /// <summary>
-        /// Interval in seconds for session tracking logs (Default: 300s = 5 minutes).
+        /// Interval in seconds for session tracking logs (Default: 120s = 2 minutes).
         /// </summary>
-        public float SessionIntervalSeconds = 300f;
+        public float SessionIntervalSeconds = 120f;
 
         /// <summary>
         /// Maximum number of logs cached in PlayerPrefs when offline or on network failure.

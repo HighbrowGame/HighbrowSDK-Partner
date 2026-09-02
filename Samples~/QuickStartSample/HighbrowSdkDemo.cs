@@ -44,8 +44,8 @@ namespace Highbrow.Samples
                 ClientVersion = Application.version, // Optional: defaults to Application.version
                 UseSandbox = useSandbox, // Set false for live release
                 EnableLog = true,
-                AutoSessionTracking = true, // 5-min session heartbeat (Alive) starts automatically
-                SessionIntervalSeconds = 300f,
+                AutoSessionTracking = true, // 2-min session heartbeat (Alive) starts automatically
+                SessionIntervalSeconds = 120f,
                 DebugMode = true
             };
 

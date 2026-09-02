@@ -55,10 +55,10 @@ namespace Highbrow.Log
         }
 
         /// <summary>
-        /// Starts periodic session heartbeat tracking (default: 5 minutes / 300 seconds).
+        /// Starts periodic session heartbeat tracking (default: 2 minutes / 120 seconds).
         /// Automatically enabled if AutoSessionTracking = true in HighbrowConfig.
         /// </summary>
-        public static void StartSessionTracking(float intervalSeconds = 300f)
+        public static void StartSessionTracking(float intervalSeconds = 120f)
         {
             Manager.StartSessionTracking(intervalSeconds);
         }

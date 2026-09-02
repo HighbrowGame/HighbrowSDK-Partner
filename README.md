@@ -155,8 +155,8 @@ public class GameInitializer : MonoBehaviour
             UseSandbox = false,                         // true: 샌드박스 테스트, false: 상용 라이브 배포
             
             EnableLog = true,                           // 로그 모듈 활성화
-            AutoSessionTracking = true,                 // 5분 주기 세션 하트비트(Alive) 자동 활성화
-            SessionIntervalSeconds = 300f,              // 세션 로그 주기 (기본 300초 = 5분)
+            AutoSessionTracking = true,                 // 2분 주기 세션 하트비트(Alive) 자동 활성화
+            SessionIntervalSeconds = 120f,              // 세션 로그 주기 (기본 120초 = 2분)
             MaxOfflineQueueSize = 300,                  // 오프라인 캐시 최대 개수
             FlushRetryIntervalSeconds = 30f,            // 오프라인 큐 재전송 주기 (초)
             DebugMode = false                           // 상용 배포 시 false 지정
@@ -172,7 +172,7 @@ public class GameInitializer : MonoBehaviour
 | 로그 종류 | API 메서드 | 설명 |
 | :--- | :--- | :--- |
 | **1. 인증 로그** | `HighbrowLog.TrackAuth(suid, accountId, accountType, nickname);` | 로그인 완료 시점 호출 (신규 유저/DAU 서버 자동 판별) |
-| **2. 세션 하트비트** | `HighbrowLog.StartSessionTracking();` | 5분 주기 자동 발송 (`AutoSessionTracking = true` 시 자동 동작) |
+| **2. 세션 하트비트** | `HighbrowLog.StartSessionTracking();` | 2분 주기 자동 발송 (`AutoSessionTracking = true` 시 자동 동작) |
 | **3. 결제 영수증** | `HighbrowLog.TrackPurchase(receiptId, price, priceId, productId, productName);` | IAP 결제 성공 시점 호출 (첫 결제 여부 서버 자동 판별) |
 | **4. 광고 시청** | `HighbrowLog.TrackAd(adType);` | 광고 시청 완료 시점 호출 |
 

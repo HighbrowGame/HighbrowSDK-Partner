@@ -11,7 +11,7 @@ namespace Highbrow.Core
     /// </summary>
     public static class HighbrowSDK
     {
-        public const string SdkVersion = "1.2.2";
+        public const string SdkVersion = "1.2.3";
 
         private static readonly Dictionary<Type, IHighbrowModule> registeredModules = new Dictionary<Type, IHighbrowModule>();
         private static HighbrowConfig activeConfig;

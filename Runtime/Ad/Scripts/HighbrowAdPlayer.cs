@@ -4,6 +4,7 @@ using Highbrow.Core.Utils;
 using Highbrow.Log;
 using Highbrow.UI;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
 using UnityEngine.Video;
@@ -188,6 +189,8 @@ namespace Highbrow.Ad
         /// <returns>Spawned HighbrowAdPlayer component, or null on failure.</returns>
         public static HighbrowAdPlayer Show(Action onCompleted = null, Action onFailed = null, Canvas parentCanvas = null)
         {
+            EnsureEventSystem();
+
             GameObject prefab = Resources.Load<GameObject>(PREFAB_RESOURCE_PATH);
             if (prefab == null)
             {
@@ -220,6 +223,7 @@ namespace Highbrow.Ad
             }
             else if (canvas.name == "HighbrowAdCanvas")
             {
+                canvas.gameObject.SetActive(true);
                 canvas.sortingOrder = 32767;
                 CanvasScaler scaler = canvas.GetComponent<CanvasScaler>();
                 if (scaler == null)
@@ -602,6 +606,26 @@ namespace Highbrow.Ad
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1280f, 720f);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
+        }
+
+        private static void EnsureEventSystem()
+        {
+            if (EventSystem.current == null)
+            {
+#if UNITY_2023_1_OR_NEWER
+                var existing = UnityEngine.Object.FindFirstObjectByType<EventSystem>();
+#else
+                var existing = UnityEngine.Object.FindObjectOfType<EventSystem>();
+#endif
+                if (existing == null)
+                {
+                    GameObject eventSystemObj = new GameObject("EventSystem");
+                    eventSystemObj.AddComponent<EventSystem>();
+                    eventSystemObj.AddComponent<StandaloneInputModule>();
+                    DontDestroyOnLoad(eventSystemObj);
+                    HighbrowLogger.Log("[HighbrowAdPlayer] No EventSystem found in scene. Created a default EventSystem for UI interactions.");
+                }
+            }
         }
 
         #endregion

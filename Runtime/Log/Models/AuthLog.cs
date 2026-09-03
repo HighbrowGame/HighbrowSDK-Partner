@@ -1,4 +1,5 @@
 using System;
+using UnityEngine.Scripting;
 
 namespace Highbrow.Log
 {
@@ -6,6 +7,7 @@ namespace Highbrow.Log
     /// User authentication / login log recorded on successful login.
     /// JSON Keys match Snowflake AUTH log schema (PascalCase).
     /// </summary>
+    [Preserve]
     [Serializable]
     public class AuthLog
     {

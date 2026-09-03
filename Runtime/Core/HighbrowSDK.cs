@@ -11,7 +11,7 @@ namespace Highbrow.Core
     /// </summary>
     public static class HighbrowSDK
     {
-        public const string SdkVersion = "1.3.0";
+        public const string SdkVersion = "1.3.1";
 
         private static readonly Dictionary<Type, IHighbrowModule> registeredModules = new Dictionary<Type, IHighbrowModule>();
         private static HighbrowConfig activeConfig;
@@ -90,6 +90,9 @@ namespace Highbrow.Core
 
                 // Ensure lifecycle dispatcher is active
                 HighbrowDispatcher.EnsureCreated();
+
+                // Pre-warm context metadata on main thread for cross-thread tracking safety
+                HighbrowContext.PreWarm(activeConfig);
 
                 HighbrowLogger.Log($"Initializing Highbrow SDK Core v{SdkVersion} (Sandbox: {config.UseSandbox}, Market: {config.Market}, AppKey: {MaskKey(config.AppKey)})");
 

@@ -1,4 +1,5 @@
 using System;
+using UnityEngine.Scripting;
 
 namespace Highbrow.Log
 {
@@ -6,6 +7,7 @@ namespace Highbrow.Log
     /// In-App Purchase store receipt log recorded upon successful store purchase.
     /// JSON Keys match Snowflake STORE_RECEIPT log schema.
     /// </summary>
+    [Preserve]
     [Serializable]
     public class StoreReceiptLog
     {

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Highbrow.Core.Utils;
 using UnityEngine;
+using UnityEngine.Scripting;
 
 namespace Highbrow.Core.Network
 {
@@ -16,6 +17,7 @@ namespace Highbrow.Core.Network
         private readonly object queueLock = new object();
         private QueuedLogWrapper cachedData;
 
+        [Preserve]
         [Serializable]
         public class QueuedLogItem
         {
@@ -33,6 +35,7 @@ namespace Highbrow.Core.Network
             }
         }
 
+        [Preserve]
         [Serializable]
         public class QueuedLogWrapper
         {
@@ -150,13 +153,28 @@ namespace Highbrow.Core.Network
             }
         }
 
-        private void SaveQueueToPrefs()
+        /// <summary>
+        /// Flushes in-memory queue changes to persistent storage immediately.
+        /// Recommended to call during application pause or quit.
+        /// </summary>
+        public void PersistToDisk()
+        {
+            lock (queueLock)
+            {
+                SaveQueueToPrefs(true);
+            }
+        }
+
+        private void SaveQueueToPrefs(bool flushToDisk = false)
         {
             try
             {
                 string json = JsonUtility.ToJson(cachedData);
                 PlayerPrefs.SetString(PrefsQueueKey, json);
-                PlayerPrefs.Save();
+                if (flushToDisk)
+                {
+                    PlayerPrefs.Save();
+                }
             }
             catch (Exception ex)
             {

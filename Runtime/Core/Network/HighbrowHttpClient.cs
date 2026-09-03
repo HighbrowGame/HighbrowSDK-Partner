@@ -32,23 +32,39 @@ namespace Highbrow.Core.Network
         /// <param name="onComplete">Callback with (success, error/responseMessage).</param>
         public void PostJson(string endpointUrl, string appKey, string logType, string jsonPayload, Action<bool, string> onComplete)
         {
+            PostJson(endpointUrl, appKey, logType, jsonPayload, (success, responseCode, response) =>
+            {
+                onComplete?.Invoke(success, response);
+            });
+        }
+
+        /// <summary>
+        /// Sends an asynchronous HTTP POST request with JSON payload, returning HTTP status code.
+        /// </summary>
+        /// <param name="endpointUrl">Target server URL.</param>
+        /// <param name="appKey">Application Key for authorization header.</param>
+        /// <param name="logType">Type header identifier (e.g. LogAuth, LogAlive).</param>
+        /// <param name="jsonPayload">JSON formatted string.</param>
+        /// <param name="onComplete">Callback with (success, httpStatusCode, error/responseMessage).</param>
+        public void PostJson(string endpointUrl, string appKey, string logType, string jsonPayload, Action<bool, long, string> onComplete)
+        {
             if (string.IsNullOrEmpty(endpointUrl))
             {
-                onComplete?.Invoke(false, "Endpoint URL is empty.");
+                onComplete?.Invoke(false, 0, "Endpoint URL is empty.");
                 return;
             }
 
             HighbrowDispatcher dispatcher = HighbrowDispatcher.Instance;
             if (dispatcher == null)
             {
-                onComplete?.Invoke(false, "Dispatcher is unavailable.");
+                onComplete?.Invoke(false, 0, "Dispatcher is unavailable.");
                 return;
             }
 
             dispatcher.RunCoroutine(PostJsonCoroutine(endpointUrl, appKey, logType, jsonPayload, onComplete));
         }
 
-        private IEnumerator PostJsonCoroutine(string endpointUrl, string appKey, string logType, string jsonPayload, Action<bool, string> onComplete)
+        private IEnumerator PostJsonCoroutine(string endpointUrl, string appKey, string logType, string jsonPayload, Action<bool, long, string> onComplete)
         {
             byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonPayload);
 
@@ -92,17 +108,19 @@ namespace Highbrow.Core.Network
                     LogResponseDump(request);
                 }
 
+                long responseCode = request.responseCode;
+
                 if (isSuccess)
                 {
                     string responseText = request.downloadHandler?.text ?? string.Empty;
-                    HighbrowLogger.Log($"[{logType}] Sent successfully. Response Code: {request.responseCode}");
-                    onComplete?.Invoke(true, responseText);
+                    HighbrowLogger.Log($"[{logType}] Sent successfully. Response Code: {responseCode}");
+                    onComplete?.Invoke(true, responseCode, responseText);
                 }
                 else
                 {
-                    string errorMsg = $"HTTP {request.responseCode} - {request.error}";
+                    string errorMsg = $"HTTP {responseCode} - {request.error}";
                     HighbrowLogger.LogWarning($"[{logType}] Request failed: {errorMsg}");
-                    onComplete?.Invoke(false, errorMsg);
+                    onComplete?.Invoke(false, responseCode, errorMsg);
                 }
             }
         }

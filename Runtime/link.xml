@@ -1,0 +1,5 @@
+<linker>
+  <assembly fullname="Highbrow.Core" preserve="all"/>
+  <assembly fullname="Highbrow.Log" preserve="all"/>
+  <assembly fullname="Highbrow.Ad" preserve="all"/>
+</linker>

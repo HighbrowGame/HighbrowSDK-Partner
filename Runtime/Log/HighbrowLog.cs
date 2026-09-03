@@ -25,7 +25,14 @@ namespace Highbrow.Log
         /// </summary>
         public static void SetUserInfo(string suid, string accountId = null, AccountType accountType = AccountType.None, string duid = null)
         {
-            Manager.SetUserInfo(suid, accountId, accountType, duid);
+            try
+            {
+                Manager.SetUserInfo(suid, accountId, accountType, duid);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[HighbrowLog] Error in SetUserInfo: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -33,7 +40,14 @@ namespace Highbrow.Log
         /// </summary>
         public static void ClearUser()
         {
-            Manager.ClearUser();
+            try
+            {
+                Manager.ClearUser();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[HighbrowLog] Error in ClearUser: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -42,7 +56,14 @@ namespace Highbrow.Log
         /// </summary>
         public static void SetCountry(string countryCode)
         {
-            Manager.SetCountry(countryCode);
+            try
+            {
+                Manager.SetCountry(countryCode);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[HighbrowLog] Error in SetCountry: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -52,7 +73,14 @@ namespace Highbrow.Log
         /// </summary>
         public static void TrackAuth(string suid, string accountId, AccountType accountType, string nickname, string duid = null, string result = "OK", string ipAddress = null)
         {
-            Manager.TrackAuth(suid, accountId, accountType, nickname, duid, result, ipAddress);
+            try
+            {
+                Manager.TrackAuth(suid, accountId, accountType, nickname, duid, result, ipAddress);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[HighbrowLog] Error in TrackAuth: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -61,7 +89,14 @@ namespace Highbrow.Log
         /// </summary>
         public static void TrackPurchase(string receiptId, float price, string priceId, int productId, string productName, DateTime? purchaseTime = null, string suid = null)
         {
-            Manager.TrackPurchase(receiptId, price, priceId, productId, productName, purchaseTime, suid);
+            try
+            {
+                Manager.TrackPurchase(receiptId, price, priceId, productId, productName, purchaseTime, suid);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[HighbrowLog] Error in TrackPurchase: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -69,7 +104,14 @@ namespace Highbrow.Log
         /// </summary>
         public static void TrackAd(AdType adType, string customAdTypeName = null, string suid = null)
         {
-            Manager.TrackAd(adType, customAdTypeName, suid);
+            try
+            {
+                Manager.TrackAd(adType, customAdTypeName, suid);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[HighbrowLog] Error in TrackAd: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -78,7 +120,14 @@ namespace Highbrow.Log
         /// </summary>
         public static void StartSessionTracking(float intervalSeconds = 120f)
         {
-            Manager.StartSessionTracking(intervalSeconds);
+            try
+            {
+                Manager.StartSessionTracking(intervalSeconds);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[HighbrowLog] Error in StartSessionTracking: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -86,7 +135,14 @@ namespace Highbrow.Log
         /// </summary>
         public static void StopSessionTracking()
         {
-            Manager.StopSessionTracking();
+            try
+            {
+                Manager.StopSessionTracking();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[HighbrowLog] Error in StopSessionTracking: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -94,7 +150,14 @@ namespace Highbrow.Log
         /// </summary>
         public static void FlushOfflineQueue(Action<int> onCompleted = null)
         {
-            Manager.FlushOfflineQueue(onCompleted);
+            try
+            {
+                Manager.FlushOfflineQueue(onCompleted);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[HighbrowLog] Error in FlushOfflineQueue: {ex.Message}");
+            }
         }
     }
 }

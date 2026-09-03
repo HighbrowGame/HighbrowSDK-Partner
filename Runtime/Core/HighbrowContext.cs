@@ -14,6 +14,41 @@ namespace Highbrow.Core
         private const string PrefsDuidKey = "HIGHBROW_SDK_SAVED_DUID";
         private static string cachedDuid;
         private static string cachedCountry;
+        private static int? cachedOsType;
+        private static string cachedDeviceInfo;
+        private static string cachedClientVersion;
+        private static int? cachedMarketType;
+        private static bool isPreWarmed = false;
+
+        /// <summary>
+        /// Pre-warms and caches immutable device, OS, and platform metadata on the Unity main thread.
+        /// Prevents Unity main-thread exceptions when log tracking methods are invoked from background/worker threads.
+        /// </summary>
+        public static void PreWarm(HighbrowConfig config = null)
+        {
+            try
+            {
+                if (!isPreWarmed)
+                {
+                    cachedDuid = GetDuid();
+                    cachedOsType = ResolvePlatformOsType();
+                    cachedDeviceInfo = ResolvePlatformDeviceInfo();
+                    cachedClientVersion = ResolvePlatformClientVersion(config?.ClientVersion);
+                    cachedMarketType = ResolvePlatformMarket(config != null ? config.Market : MarketType.None, config?.CustomMarket);
+                    string country = GetCountry(config?.CustomCountry);
+                    if (!string.IsNullOrEmpty(country))
+                    {
+                        cachedCountry = country;
+                    }
+                    isPreWarmed = true;
+                    HighbrowLogger.Log("[HighbrowContext] Pre-warmed metadata successfully for cross-thread safety.");
+                }
+            }
+            catch (Exception ex)
+            {
+                HighbrowLogger.LogWarning($"[HighbrowContext] PreWarm warning: {ex.Message}");
+            }
+        }
 
         /// <summary>
         /// Returns current UTC timestamp formatted as ISO 8601 string (e.g. 2026-08-31T11:29:44.123456Z).
@@ -34,6 +69,7 @@ namespace Highbrow.Core
 
         /// <summary>
         /// Gets device unique identifier with fallback and caching.
+        /// Safe for background threads if pre-warmed.
         /// </summary>
         public static string GetDuid(string customDuid = null)
         {
@@ -47,20 +83,28 @@ namespace Highbrow.Core
                 return cachedDuid;
             }
 
-            string duid = SystemInfo.deviceUniqueIdentifier;
-            if (string.IsNullOrEmpty(duid) || duid == SystemInfo.unsupportedIdentifier)
+            try
             {
-                duid = PlayerPrefs.GetString(PrefsDuidKey, string.Empty);
-                if (string.IsNullOrEmpty(duid))
+                string duid = SystemInfo.deviceUniqueIdentifier;
+                if (string.IsNullOrEmpty(duid) || duid == SystemInfo.unsupportedIdentifier)
                 {
-                    duid = Guid.NewGuid().ToString("N");
-                    PlayerPrefs.SetString(PrefsDuidKey, duid);
-                    PlayerPrefs.Save();
+                    duid = PlayerPrefs.GetString(PrefsDuidKey, string.Empty);
+                    if (string.IsNullOrEmpty(duid))
+                    {
+                        duid = Guid.NewGuid().ToString("N");
+                        PlayerPrefs.SetString(PrefsDuidKey, duid);
+                        PlayerPrefs.Save();
+                    }
                 }
-            }
 
-            cachedDuid = duid;
-            return cachedDuid;
+                cachedDuid = duid;
+                return cachedDuid;
+            }
+            catch
+            {
+                // Fallback for background thread invocation if not pre-warmed
+                return Guid.NewGuid().ToString("N");
+            }
         }
 
         /// <summary>
@@ -69,23 +113,42 @@ namespace Highbrow.Core
         /// </summary>
         public static int GetOsType()
         {
-            switch (Application.platform)
+            if (cachedOsType.HasValue)
             {
-                case RuntimePlatform.IPhonePlayer:
-                    return 1; // iOS
-                case RuntimePlatform.Android:
-                    return 2; // Android
-                case RuntimePlatform.OSXPlayer:
-                case RuntimePlatform.OSXEditor:
-                    return 3; // OSX
-                case RuntimePlatform.WindowsPlayer:
-                case RuntimePlatform.WindowsEditor:
-                    return 4; // Windows
-                case RuntimePlatform.LinuxPlayer:
-                case RuntimePlatform.LinuxEditor:
-                    return 5; // Linux
-                default:
-                    return 6; // PC / Other
+                return cachedOsType.Value;
+            }
+
+            int os = ResolvePlatformOsType();
+            cachedOsType = os;
+            return os;
+        }
+
+        private static int ResolvePlatformOsType()
+        {
+            try
+            {
+                switch (Application.platform)
+                {
+                    case RuntimePlatform.IPhonePlayer:
+                        return 1; // iOS
+                    case RuntimePlatform.Android:
+                        return 2; // Android
+                    case RuntimePlatform.OSXPlayer:
+                    case RuntimePlatform.OSXEditor:
+                        return 3; // OSX
+                    case RuntimePlatform.WindowsPlayer:
+                    case RuntimePlatform.WindowsEditor:
+                        return 4; // Windows
+                    case RuntimePlatform.LinuxPlayer:
+                    case RuntimePlatform.LinuxEditor:
+                        return 5; // Linux
+                    default:
+                        return 6; // PC / Other
+                }
+            }
+            catch
+            {
+                return 6;
             }
         }
 
@@ -106,6 +169,28 @@ namespace Highbrow.Core
                 return customMarket.Value;
             }
 
+            if (cachedMarketType.HasValue)
+            {
+                return cachedMarketType.Value;
+            }
+
+            int market = ResolvePlatformMarket(configMarket, customMarket);
+            cachedMarketType = market;
+            return market;
+        }
+
+        private static int ResolvePlatformMarket(MarketType configMarket = MarketType.None, int? customMarket = null)
+        {
+            if (configMarket != MarketType.None)
+            {
+                return (int)configMarket;
+            }
+
+            if (customMarket.HasValue && customMarket.Value > 0)
+            {
+                return customMarket.Value;
+            }
+
 #if ONESTORE || ONE_STORE
             return 4; // OneStore
 #elif SAMSUNG || SAMSUNG_STORE || GALAXY_STORE
@@ -114,18 +199,25 @@ namespace Highbrow.Core
             return 3; // Steam
 #endif
 
-            switch (Application.platform)
+            try
             {
-                case RuntimePlatform.IPhonePlayer:
-                case RuntimePlatform.OSXPlayer:
-                    return 1; // AppleStore
-                case RuntimePlatform.Android:
-                    return 2; // GooglePlay default fallback
-                case RuntimePlatform.WindowsPlayer:
-                case RuntimePlatform.WindowsEditor:
-                    return 3; // Steam default fallback
-                default:
-                    return 0; // None
+                switch (Application.platform)
+                {
+                    case RuntimePlatform.IPhonePlayer:
+                    case RuntimePlatform.OSXPlayer:
+                        return 1; // AppleStore
+                    case RuntimePlatform.Android:
+                        return 2; // GooglePlay default fallback
+                    case RuntimePlatform.WindowsPlayer:
+                    case RuntimePlatform.WindowsEditor:
+                        return 3; // Steam default fallback
+                    default:
+                        return 0; // None
+                }
+            }
+            catch
+            {
+                return 0;
             }
         }
 
@@ -272,8 +364,32 @@ namespace Highbrow.Core
                 return customVersion;
             }
 
-            string version = Application.version;
-            return string.IsNullOrEmpty(version) ? "1.0.0" : version;
+            if (!string.IsNullOrEmpty(cachedClientVersion))
+            {
+                return cachedClientVersion;
+            }
+
+            string version = ResolvePlatformClientVersion(customVersion);
+            cachedClientVersion = version;
+            return version;
+        }
+
+        private static string ResolvePlatformClientVersion(string customVersion = null)
+        {
+            if (!string.IsNullOrEmpty(customVersion))
+            {
+                return customVersion;
+            }
+
+            try
+            {
+                string version = Application.version;
+                return string.IsNullOrEmpty(version) ? "1.0.0" : version;
+            }
+            catch
+            {
+                return "1.0.0";
+            }
         }
 
         /// <summary>
@@ -281,9 +397,28 @@ namespace Highbrow.Core
         /// </summary>
         public static string GetDeviceInfo()
         {
-            string deviceModel = SystemInfo.deviceModel;
-            string os = SystemInfo.operatingSystem;
-            return $"{deviceModel} | {os}";
+            if (!string.IsNullOrEmpty(cachedDeviceInfo))
+            {
+                return cachedDeviceInfo;
+            }
+
+            string info = ResolvePlatformDeviceInfo();
+            cachedDeviceInfo = info;
+            return info;
+        }
+
+        private static string ResolvePlatformDeviceInfo()
+        {
+            try
+            {
+                string deviceModel = SystemInfo.deviceModel;
+                string os = SystemInfo.operatingSystem;
+                return $"{deviceModel} | {os}";
+            }
+            catch
+            {
+                return "Unknown | Unknown";
+            }
         }
     }
 }

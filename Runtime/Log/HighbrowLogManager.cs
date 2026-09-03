@@ -351,6 +351,12 @@ namespace Highbrow.Log
 
         private void SendUserSessionLog()
         {
+            // Do not emit session alive logs if user has not completed authentication (no active SUID)
+            if (string.IsNullOrEmpty(currentSuid))
+            {
+                return;
+            }
+
             UserSessionLog log = new UserSessionLog
             {
                 Time = HighbrowContext.GetUtcNowIsoString(),
@@ -371,7 +377,12 @@ namespace Highbrow.Log
 
         private void SendLog(string logPath, string logType, string jsonPayload)
         {
-            if (!IsInitialized || httpClient == null || HighbrowDispatcher.IsQuitting)
+            if (!EnsureInitialized())
+            {
+                return;
+            }
+
+            if (httpClient == null || HighbrowDispatcher.IsQuitting)
             {
                 HighbrowLogger.Log($"SDK unavailable for transmission. Caching [{logPath}] into offline queue.");
                 offlineQueue?.Enqueue(logPath, jsonPayload);
@@ -381,18 +392,54 @@ namespace Highbrow.Log
             string endpoint = config?.GetEndpointUrl(logPath);
             string appKey = config?.AppKey;
 
-            httpClient.PostJson(endpoint, appKey, logType, jsonPayload, (success, response) =>
+            httpClient.PostJson(endpoint, appKey, logType, jsonPayload, (success, responseCode, response) =>
             {
                 if (!success)
                 {
-                    HighbrowLogger.LogWarning($"Failed to transmit [{logPath}]. Enqueueing to PlayerPrefs offline cache.");
-                    offlineQueue.Enqueue(logPath, jsonPayload);
+                    // 4xx Client Error (e.g. 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found)
+                    // Permanent client configuration error: Retrying will never succeed and floods server.
+                    if (responseCode >= 400 && responseCode < 500)
+                    {
+                        HighbrowLogger.LogError($"[{logType}] Permanent HTTP {responseCode} error. Dropping log from retry queue. Please verify your AppKey and payload schema.");
+                        return;
+                    }
+
+                    // Transient error (Network failure, timeout, or 5xx server error): Enqueue for offline retry
+                    HighbrowLogger.LogWarning($"Failed to transmit [{logPath}] (HTTP {responseCode}). Enqueueing to PlayerPrefs offline cache.");
+                    offlineQueue?.Enqueue(logPath, jsonPayload);
                 }
                 else
                 {
-                    HighbrowLogger.Log($"[{logPath}] Delivered successfully.");
+                    HighbrowLogger.Log($"[{logType}] Delivered successfully.");
                 }
             });
+        }
+
+        private bool EnsureInitialized()
+        {
+            if (IsInitialized && config != null)
+            {
+                return true;
+            }
+
+            // Attempt self-healing via HighbrowSettings
+            try
+            {
+                HighbrowSettings settings = HighbrowSettings.LoadSettings();
+                if (settings != null && !string.IsNullOrWhiteSpace(settings.AppKey))
+                {
+                    HighbrowLogger.Log("[HighbrowSDK] Automatically initializing SDK using HighbrowSettings fallback upon log tracking call.");
+                    HighbrowSDK.Initialize(settings.ToConfig());
+                    return IsInitialized;
+                }
+            }
+            catch (Exception ex)
+            {
+                HighbrowLogger.LogWarning($"[HighbrowSDK] Auto-initialization attempt failed: {ex.Message}");
+            }
+
+            Debug.LogError("[HighbrowSDK] CRITICAL ERROR: HighbrowSDK is not initialized! You must call HighbrowSDK.Initialize() in your game bootstrap script before tracking logs.");
+            return false;
         }
 
         private IEnumerator PeriodicFlushCoroutine()
@@ -439,9 +486,15 @@ namespace Highbrow.Log
                 string resolvedEndpoint = ResolveEndpointFromQueuedLog(item.LogType);
                 string logTypeHeader = ExtractLogTypeName(item.LogType);
 
-                httpClient.PostJson(resolvedEndpoint, config?.AppKey, logTypeHeader, item.JsonPayload, (success, res) =>
+                httpClient.PostJson(resolvedEndpoint, config?.AppKey, logTypeHeader, item.JsonPayload, (success, responseCode, res) =>
                 {
                     isSuccess = success;
+                    // Permanent 4xx error: Drop item so it does not block the FIFO queue
+                    if (!success && responseCode >= 400 && responseCode < 500)
+                    {
+                        HighbrowLogger.LogError($"[HighbrowLog] Permanent HTTP {responseCode} error during queue flush. Dropping invalid item from offline cache.");
+                        isSuccess = true; // Mark as processed to remove from queue
+                    }
                     isDone = true;
                 });
 
@@ -545,21 +598,25 @@ namespace Highbrow.Log
             if (string.IsNullOrEmpty(rawReceiptId)) return string.Empty;
             string trimmed = rawReceiptId.Trim();
 
-            // Unity IAP defensive parsing: If developer passed the entire receipt JSON wrapper
-            // e.g. {"Store":"GooglePlay","TransactionID":"GPA.3312-...","Payload":"..."}
+            // Unity IAP defensive parsing: If developer passed the entire receipt JSON wrapper or inner payload JSON
+            // Supports standard JSON and escaped JSON (\"orderId\": \"GPA...\"), plus OneStore txid/paymentId
             if (trimmed.StartsWith("{") && trimmed.EndsWith("}"))
             {
                 try
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(
                         trimmed,
-                        @"""(?:TransactionID|transactionId|orderId|order_id)""\s*:\s*""([^""]+)""",
+                        @"(?:\\?""|\b)(?:TransactionID|transactionId|orderId|order_id|txid|paymentId)(?:\\?"")\s*:\s*\\?""([^""\\]+)",
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase
                     );
                     if (match.Success && !string.IsNullOrEmpty(match.Groups[1].Value))
                     {
                         HighbrowLogger.Log($"[HighbrowLog] Auto-extracted TransactionID '{match.Groups[1].Value}' from raw JSON receipt.");
                         return match.Groups[1].Value;
+                    }
+                    else
+                    {
+                        HighbrowLogger.LogWarning("[HighbrowLog] Receipt was passed as JSON but failed to extract a transaction ID. Please pass args.purchasedProduct.transactionID directly.");
                     }
                 }
                 catch { }
@@ -584,16 +641,24 @@ namespace Highbrow.Log
         {
             if (isPaused)
             {
-                HighbrowLogger.Log("App pausing. Triggering session heartbeat and queue flush.");
-                SendUserSessionLog();
+                if (!string.IsNullOrEmpty(currentSuid))
+                {
+                    HighbrowLogger.Log("App pausing. Triggering session heartbeat and queue flush.");
+                    SendUserSessionLog();
+                }
                 FlushOfflineQueue();
+                offlineQueue?.PersistToDisk();
             }
         }
 
         private void HandleApplicationQuit()
         {
-            HighbrowLogger.Log("App quitting. Caching final session heartbeat.");
-            SendUserSessionLog();
+            if (!string.IsNullOrEmpty(currentSuid))
+            {
+                HighbrowLogger.Log("App quitting. Caching final session heartbeat.");
+                SendUserSessionLog();
+            }
+            offlineQueue?.PersistToDisk();
         }
 
         private static string MaskIdentifier(string val)

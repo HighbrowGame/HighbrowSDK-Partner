@@ -1,4 +1,5 @@
 using System;
+using UnityEngine.Scripting;
 
 namespace Highbrow.Log
 {
@@ -6,6 +7,7 @@ namespace Highbrow.Log
     /// Advertisement impression log recorded upon ad view.
     /// JSON Keys match Snowflake ADVERTISEMENT log schema.
     /// </summary>
+    [Preserve]
     [Serializable]
     public class AdLog
     {

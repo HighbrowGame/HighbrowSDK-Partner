@@ -74,6 +74,8 @@ namespace Highbrow.Ad
 
         void Awake()
         {
+            EnsureCanvasScaler();
+
             if (AdsVideoPlayer == null)
                 AdsVideoPlayer = GetComponentInChildren<VideoPlayer>();
             if (VideoScreen == null)
@@ -197,11 +199,11 @@ namespace Highbrow.Ad
             Canvas canvas = parentCanvas;
             if (canvas == null)
             {
-#if UNITY_2023_1_OR_NEWER
-                canvas = FindFirstObjectByType<Canvas>();
-#else
-                canvas = FindObjectOfType<Canvas>();
-#endif
+                GameObject existingCanvasObj = GameObject.Find("HighbrowAdCanvas");
+                if (existingCanvasObj != null)
+                {
+                    canvas = existingCanvasObj.GetComponent<Canvas>();
+                }
             }
 
             if (canvas == null)
@@ -209,8 +211,22 @@ namespace Highbrow.Ad
                 GameObject canvasObj = new GameObject("HighbrowAdCanvas");
                 canvas = canvasObj.AddComponent<Canvas>();
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-                canvasObj.AddComponent<CanvasScaler>();
+                canvas.sortingOrder = 32767;
+
+                CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
+                ConfigureCanvasScaler(scaler);
+
                 canvasObj.AddComponent<GraphicRaycaster>();
+            }
+            else if (canvas.name == "HighbrowAdCanvas")
+            {
+                canvas.sortingOrder = 32767;
+                CanvasScaler scaler = canvas.GetComponent<CanvasScaler>();
+                if (scaler == null)
+                {
+                    scaler = canvas.gameObject.AddComponent<CanvasScaler>();
+                }
+                ConfigureCanvasScaler(scaler);
             }
 
             GameObject instance = Instantiate(prefab, canvas.transform);
@@ -565,6 +581,27 @@ namespace Highbrow.Ad
                 return false;
             }
             return true;
+        }
+
+        private void EnsureCanvasScaler()
+        {
+            Canvas parentCanvas = GetComponentInParent<Canvas>();
+            if (parentCanvas != null && parentCanvas.name == "HighbrowAdCanvas")
+            {
+                parentCanvas.sortingOrder = 32767;
+                var scaler = parentCanvas.GetComponent<CanvasScaler>();
+                if (scaler == null)
+                    scaler = parentCanvas.gameObject.AddComponent<CanvasScaler>();
+                ConfigureCanvasScaler(scaler);
+            }
+        }
+
+        private static void ConfigureCanvasScaler(CanvasScaler scaler)
+        {
+            if (scaler == null) return;
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1280f, 720f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
         }
 
         #endregion

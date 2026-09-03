@@ -103,8 +103,8 @@ HighbrowSDK.Initialize(config);
       string receiptId,             // Apple transactionID or Google orderId
       float price,                  // Product price (e.g. 0.99f)
       string priceId,               // Store item SKU (e.g. "com.game.gem_100")
-      int productId,                // Internal numeric product ID
-      string productName,           // Product display name
+      int productId = 0,            // Internal numeric product ID (optional, default: 0)
+      string productName = "",      // Product display name (optional, default: "")
       DateTime? purchaseTime = null,// Null defaults to DateTime.UtcNow
       string suid = null            // Optional SUID override
   );

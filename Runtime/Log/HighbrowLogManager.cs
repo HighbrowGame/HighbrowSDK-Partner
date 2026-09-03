@@ -178,6 +178,14 @@ namespace Highbrow.Log
         {
             try
             {
+                if (!EnsureInitialized()) return;
+
+                if (string.IsNullOrWhiteSpace(suid))
+                {
+                    Debug.LogError("[HighbrowLog] TrackAuth failed: 'suid' must not be null or empty. A valid unique user ID is required.");
+                    return;
+                }
+
                 SetUserInfo(suid, accountId, accountType, duid);
 
                 AuthLog log = new AuthLog
@@ -217,20 +225,29 @@ namespace Highbrow.Log
         /// <summary>
         /// Tracks in-app purchase store receipt.
         /// Backend automatically derives First Purchase (New Paying) metrics by querying user purchase history in DB.
+        /// Requires user to be authenticated via TrackAuth first.
         /// </summary>
         /// <param name="receiptId">Store receipt transaction ID (Apple transactionId / Google orderId).</param>
         /// <param name="price">Product price in USD/local currency standard.</param>
         /// <param name="priceId">Store item identifier.</param>
-        /// <param name="productId">Internal game product numeric ID.</param>
-        /// <param name="productName">Product name string.</param>
+        /// <param name="productId">Internal game product numeric ID (optional, default: 0).</param>
+        /// <param name="productName">Product name string (optional, default: empty).</param>
         /// <param name="purchaseTime">Purchase timestamp (UTC). Defaults to UtcNow.</param>
         /// <param name="suid">Optional SUID override.</param>
-        public void TrackPurchase(string receiptId, float price, string priceId, int productId, string productName, DateTime? purchaseTime = null, string suid = null)
+        public void TrackPurchase(string receiptId, float price, string priceId, int productId = 0, string productName = "", DateTime? purchaseTime = null, string suid = null)
         {
             try
             {
-                DateTime pTime = purchaseTime ?? DateTime.UtcNow;
+                if (!EnsureInitialized()) return;
+
                 string targetSuid = ResolveSuid(suid);
+                if (string.IsNullOrEmpty(targetSuid))
+                {
+                    Debug.LogError("[HighbrowLog] TrackPurchase rejected: User is not authenticated. HighbrowLog.TrackAuth must be called upon login before sending purchase logs.");
+                    return;
+                }
+
+                DateTime pTime = purchaseTime ?? DateTime.UtcNow;
 
                 StoreReceiptLog log = new StoreReceiptLog
                 {
@@ -263,6 +280,7 @@ namespace Highbrow.Log
 
         /// <summary>
         /// Tracks advertisement view event.
+        /// Requires user to be authenticated via TrackAuth first.
         /// </summary>
         /// <param name="adType">Ad placement format type.</param>
         /// <param name="customAdTypeName">Optional string representation override of AdType.</param>
@@ -271,12 +289,21 @@ namespace Highbrow.Log
         {
             try
             {
+                if (!EnsureInitialized()) return;
+
+                string targetSuid = ResolveSuid(suid);
+                if (string.IsNullOrEmpty(targetSuid))
+                {
+                    Debug.LogError("[HighbrowLog] TrackAd rejected: User is not authenticated. HighbrowLog.TrackAuth must be called upon login before sending ad logs.");
+                    return;
+                }
+
                 string adTypeName = !string.IsNullOrEmpty(customAdTypeName) ? customAdTypeName : adType.ToString();
 
                 AdLog log = new AdLog
                 {
                     Time = HighbrowContext.GetUtcNowIsoString(),
-                    Suid = ResolveSuid(suid),
+                    Suid = targetSuid,
                     Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
                     Os = HighbrowContext.GetOsType(),
                     Country = HighbrowContext.GetCountry(config?.CustomCountry),
@@ -422,23 +449,7 @@ namespace Highbrow.Log
                 return true;
             }
 
-            // Attempt self-healing via HighbrowSettings
-            try
-            {
-                HighbrowSettings settings = HighbrowSettings.LoadSettings();
-                if (settings != null && !string.IsNullOrWhiteSpace(settings.AppKey))
-                {
-                    HighbrowLogger.Log("[HighbrowSDK] Automatically initializing SDK using HighbrowSettings fallback upon log tracking call.");
-                    HighbrowSDK.Initialize(settings.ToConfig());
-                    return IsInitialized;
-                }
-            }
-            catch (Exception ex)
-            {
-                HighbrowLogger.LogWarning($"[HighbrowSDK] Auto-initialization attempt failed: {ex.Message}");
-            }
-
-            Debug.LogError("[HighbrowSDK] CRITICAL ERROR: HighbrowSDK is not initialized! You must call HighbrowSDK.Initialize() in your game bootstrap script before tracking logs.");
+            Debug.LogError("[HighbrowSDK] ERROR: HighbrowSDK is not initialized! You must call HighbrowSDK.Initialize() before tracking any logs.");
             return false;
         }
 
@@ -589,7 +600,6 @@ namespace Highbrow.Log
                 return currentSuid;
             }
 
-            HighbrowLogger.LogWarning("[HighbrowLog] Warning: Log emission has an EMPTY SUID! Please ensure TrackAuth is called upon login before sending purchase, ad, or session logs.");
             return string.Empty;
         }
 
@@ -597,6 +607,12 @@ namespace Highbrow.Log
         {
             if (string.IsNullOrEmpty(rawReceiptId)) return string.Empty;
             string trimmed = rawReceiptId.Trim();
+
+            // Unwrap outer quotes if present (e.g. "\"{\\\"Store\\\":...}\"")
+            if (trimmed.StartsWith("\"") && trimmed.EndsWith("\"") && trimmed.Length >= 2)
+            {
+                trimmed = trimmed.Substring(1, trimmed.Length - 2).Trim();
+            }
 
             // Unity IAP defensive parsing: If developer passed the entire receipt JSON wrapper or inner payload JSON
             // Supports standard JSON and escaped JSON (\"orderId\": \"GPA...\"), plus OneStore txid/paymentId
@@ -606,7 +622,7 @@ namespace Highbrow.Log
                 {
                     var match = System.Text.RegularExpressions.Regex.Match(
                         trimmed,
-                        @"(?:\\?""|\b)(?:TransactionID|transactionId|orderId|order_id|txid|paymentId)(?:\\?"")\s*:\s*\\?""([^""\\]+)",
+                        @"(?:\\*""|\b)(?:TransactionID|transactionId|orderId|order_id|txid|paymentId)(?:\\*"")\s*:\s*\\*""([^""\\]+)",
                         System.Text.RegularExpressions.RegexOptions.IgnoreCase
                     );
                     if (match.Success && !string.IsNullOrEmpty(match.Groups[1].Value))
@@ -648,6 +664,11 @@ namespace Highbrow.Log
                 }
                 FlushOfflineQueue();
                 offlineQueue?.PersistToDisk();
+            }
+            else
+            {
+                HighbrowLogger.Log("App resumed. Flushing offline log queue.");
+                FlushOfflineQueue();
             }
         }
 

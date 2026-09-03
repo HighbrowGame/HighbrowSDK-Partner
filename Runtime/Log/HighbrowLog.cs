@@ -87,7 +87,7 @@ namespace Highbrow.Log
         /// Tracks in-app purchase store receipt.
         /// Backend automatically derives First Purchase (New Paying) metrics.
         /// </summary>
-        public static void TrackPurchase(string receiptId, float price, string priceId, int productId, string productName, DateTime? purchaseTime = null, string suid = null)
+        public static void TrackPurchase(string receiptId, float price, string priceId, int productId = 0, string productName = "", DateTime? purchaseTime = null, string suid = null)
         {
             try
             {

@@ -5,11 +5,64 @@ using UnityEngine;
 
 namespace Highbrow.Editor
 {
+    [InitializeOnLoad]
+    public static class HighbrowSdkInitializer
+    {
+        static HighbrowSdkInitializer()
+        {
+            EditorApplication.delayCall += EnsureSettingsAssetExists;
+        }
+
+        private static void EnsureSettingsAssetExists()
+        {
+            var asset = Resources.Load<HighbrowSettings>(HighbrowSettings.ResourcePath);
+            if (asset == null)
+            {
+                HighbrowSdkEditor.CreateDefaultSettingsAsset(false);
+            }
+        }
+    }
+
     /// <summary>
     /// Editor utilities for Highbrow SDK.
     /// </summary>
     public static class HighbrowSdkEditor
     {
+        [MenuItem("Highbrow/SDK Settings", false, 1)]
+        public static void SelectOrCreateSettingsAsset()
+        {
+            CreateDefaultSettingsAsset(true);
+        }
+
+        public static HighbrowSettings CreateDefaultSettingsAsset(bool selectAndPing)
+        {
+            var asset = Resources.Load<HighbrowSettings>(HighbrowSettings.ResourcePath);
+            if (asset == null)
+            {
+                const string dirPath = "Assets/Resources/Highbrow";
+                if (!System.IO.Directory.Exists(dirPath))
+                {
+                    System.IO.Directory.CreateDirectory(dirPath);
+                    AssetDatabase.Refresh();
+                }
+
+                const string assetPath = dirPath + "/HighbrowSettings.asset";
+                asset = ScriptableObject.CreateInstance<HighbrowSettings>();
+                AssetDatabase.CreateAsset(asset, assetPath);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                Debug.Log($"[HighbrowSDK Editor] Auto-created HighbrowSettings asset at '{assetPath}'.");
+            }
+
+            if (selectAndPing && asset != null)
+            {
+                Selection.activeObject = asset;
+                EditorGUIUtility.PingObject(asset);
+            }
+
+            return asset;
+        }
+
         [MenuItem("Highbrow/Clear Offline Log Cache (PlayerPrefs)", false, 10)]
         public static void ClearOfflineCache()
         {

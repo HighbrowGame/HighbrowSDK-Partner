@@ -37,6 +37,15 @@ namespace Highbrow.Log
         }
 
         /// <summary>
+        /// Explicitly sets and caches the active country code (e.g. from server authentication response).
+        /// Must be a 2-letter ISO code (e.g. "KR", "US", "JP").
+        /// </summary>
+        public static void SetCountry(string countryCode)
+        {
+            Manager.SetCountry(countryCode);
+        }
+
+        /// <summary>
         /// Tracks user authentication / login completion.
         /// Caches SUID, AccountID, AccountType, and DUID for subsequent purchase, ad, and alive logs.
         /// Automatically triggers session alive heartbeat shortly after Auth when AutoSessionTracking is enabled.

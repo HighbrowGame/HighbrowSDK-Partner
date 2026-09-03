@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace Highbrow.Core
 {
@@ -98,6 +99,12 @@ namespace Highbrow.Core
         public bool DumpHttpPayload = false;
 
         /// <summary>
+        /// HTTP request timeout in seconds for log transmissions.
+        /// Automatically clamped between 3 and 30 seconds for network safety (Default: 10s).
+        /// </summary>
+        public int HttpTimeoutSeconds = 10;
+
+        /// <summary>
         /// Custom Country code override (2-letter ISO, e.g., "KR", "US").
         /// If null or empty, detected from system/region.
         /// </summary>
@@ -179,6 +186,42 @@ namespace Highbrow.Core
             }
 
             return UseSandbox ? DefaultSandboxEndpoint : DefaultProductionEndpoint;
+        }
+
+        /// <summary>
+        /// Validates and normalizes configuration values.
+        /// Clamps network timeouts and sanitizes custom country codes.
+        /// </summary>
+        /// <param name="errorMessage">Output error message if validation fails.</param>
+        /// <returns>True if configuration is valid to proceed; otherwise false.</returns>
+        public bool Validate(out string errorMessage)
+        {
+            if (string.IsNullOrWhiteSpace(AppKey))
+            {
+                errorMessage = "AppKey is missing or empty. A valid AppKey issued by Highbrow is required.";
+                return false;
+            }
+
+            // Normalize and validate CustomCountry (2-letter ISO)
+            if (!string.IsNullOrEmpty(CustomCountry))
+            {
+                string trimmed = CustomCountry.Trim().ToUpperInvariant();
+                if (trimmed.Length == 2 && char.IsLetter(trimmed[0]) && char.IsLetter(trimmed[1]))
+                {
+                    CustomCountry = trimmed;
+                }
+                else
+                {
+                    HighbrowLogger.LogWarning($"[HighbrowConfig] Invalid CustomCountry '{CustomCountry}'. Must be a 2-letter ISO code (e.g. 'KR', 'US'). Resetting to auto-detect.");
+                    CustomCountry = null;
+                }
+            }
+
+            // Safe clamp for HTTP timeout (3s ~ 30s)
+            HttpTimeoutSeconds = Mathf.Clamp(HttpTimeoutSeconds, 3, 30);
+
+            errorMessage = null;
+            return true;
         }
 
         public HighbrowConfig() { }

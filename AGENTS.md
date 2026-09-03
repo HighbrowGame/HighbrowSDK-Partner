@@ -53,10 +53,12 @@ HighbrowConfig config = new HighbrowConfig
     EnableLog = true,
     AutoSessionTracking = true,        // Automatically sends 2-min heartbeat (Alive)
     SessionIntervalSeconds = 120f,
+    HttpTimeoutSeconds = 10,           // HTTP request timeout (clamped 3~30s)
     DebugMode = false                  // Set false in production
 };
 
 HighbrowSDK.Initialize(config);
+// Or one-line inspector-based initialization: HighbrowSDK.Initialize();
 ```
 
 ---
@@ -81,6 +83,8 @@ HighbrowSDK.Initialize(config);
   - Caches `suid`, `accountId`, `accountType`, and `duid` in memory so subsequent purchase, ad, and session logs automatically reuse them.
   - If `config.AutoSessionTracking = true`, automatically triggers the 2-minute session heartbeat (`Alive`) 1 second after `TrackAuth`.
 - **Backend Auto-Derivation:** The server automatically records `NewUserLog` if this is the user's first login. No client check needed.
+- **Optional Country Override:**
+  - To override country with ingame server-determined country: `HighbrowLog.SetCountry("KR");`
 
 ### 2) Session Tracking (`SessionTracking` / `Alive`)
 - Starts **automatically** 1 second after successful `TrackAuth` if `config.AutoSessionTracking = true` was set. No manual call needed.

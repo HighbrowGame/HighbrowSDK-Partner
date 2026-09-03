@@ -6,7 +6,7 @@
 ---
 
 ## 📑 목차
-1. [🌟 AI 원클릭 연동 가이드 (Master Prompt)](#-ai-원클릭-연동-가이드-master-prompt)
+1. [🌟 5분 AI 초고속 연동 (한 줄 킥오프)](#-5분-ai-초고속-연동-한-줄-킥오프)
 2. [특징 및 아키텍처 원칙](#-특징-및-아키텍처-원칙)
 3. [설치 가이드 (Unity Package Manager)](#-설치-가이드-unity-package-manager)
 4. [SDK 수동 초기화 및 4대 핵심 로그 API](#-sdk-수동-초기화-및-4대-핵심-로그-api)
@@ -15,75 +15,17 @@
 
 ---
 
-## 🌟 AI 원클릭 연동 가이드 (Master Prompt)
+## 🌟 5분 AI 초고속 연동 (한 줄 킥오프)
 
-파트너사 개발자가 매 작업마다 개별 프롬프트를 입력할 필요 없이, **단 하나의 마스터 프롬프트**로 전체 연동을 대화형으로 완수할 수 있습니다.
+파트너사 개발자는 복잡한 가이드를 읽거나 긴 코드를 일일이 복사할 필요가 없습니다.<br>
+사용 중인 AI 어시스턴트(**Cursor Composer, GitHub Copilot Chat, Claude Code, Windsurf**) 채팅창에 **다음 한 줄**을 그대로 입력하세요:
 
-> **사용 방법:**
-> 1. Cursor Composer / GitHub Copilot Chat / Claude에 아래 프롬프트를 전체 복사해 붙여넣습니다.
-> 2. AI가 프로젝트 상황에 대한 **간단한 사전 질문(발급 AppKey, IAP/광고 파일 위치 등)**을 제시합니다.
-> 3. 답변을 입력하면 AI가 **맞춤형 연동 계획**을 제시하고 승인을 요청합니다.
-> 4. 승인 후 AI가 프로젝트 코드를 안전하게 순차 수정합니다.
+> 📋 **AI 킥오프 프롬프트 (복사하여 AI에 입력):**
+> ```text
+> INTEGRATION_PROMPT.md를 읽고 우리 프로젝트에 HighbrowSDK를 연동해줘
+> ```
 
-```markdown
-# Role & Objective
-당신은 10년 차 이상의 Unity/C# 클라이언트 아키텍트이자 데이터 엔지니어입니다.
-현재 열려 있는 Unity 프로젝트에 `HighbrowSDK` (로그 수집 및 코어 모듈)를 연동하는 작업을 수행합니다.
-
-# Workflow & Execution Rules (엄격 준수)
-1. **[중요] 즉시 코드를 수정하지 마세요.**
-2. **Phase 1 (사전 질문):** 먼저 아래 [사전 질문 체크리스트]를 개발자에게 질문하고 응답을 기다리세요.
-3. **Phase 2 (계획 승인):** 개발자의 답변을 바탕으로 수정할 파일 목록과 구체적인 연동 계획(Integration Plan)을 정리하여 개발자에게 제시하고, **개발자의 명시적 승인("진행", "Proceed" 등)**을 받으세요.
-4. **Phase 3 (순차 실행):** 승인을 받은 후, Step 1(초기화)부터 순차적으로 최소 변경(Surgical Changes) 원칙을 지키며 기존 코드를 수정하세요.
-5. **Phase 4 (검증):** 연동 완료 후 컴파일 체크 및 테스트 확인 지침을 제공하세요.
-
----
-
-## Phase 1: 사전 질문 체크리스트 (개발자에게 이 질문을 출력하세요)
-
-프로젝트 환경과 여건에 맞게 안전하게 연동하기 위해 다음 질문에 답변해 주세요:
-
-### 1. SDK 기본 정보 및 환경 모드
-- 하이브로 발급 **AppKey**: (예: `YOUR_APP_KEY`)
-- 테스트/배포 모드:
-  - [ ] **(A) 개발/테스트 모드:** `UseSandbox = true` (샌드박스 수집 서버로 자동 전송)
-  - [ ] **(B) 라이브 상용 배포:** `UseSandbox = false` (Production 수집 서버로 자동 전송)
-
-### 2. 유저 식별자 (SUID) 및 로그인
-- 게임 내 유저 고유 ID(SUID) 변수명 또는 획득 경로: (예: `userSeq`, `FirebaseUser.UserId`, `uuid` 등)
-- 지원하는 소셜/인증 수단: (예: Google, Apple, Guest, Facebook 등)
-- 로그인 성공 콜백이 위치한 클래스/파일: (예: `LoginManager.cs`, `TitleScene.cs`)
-
-### 3. 인앱 결제 (IAP) 연동 대상
-- 사용하는 IAP 플러그인: (예: Unity IAP `IStoreListener`, 자체 결제, 기타 에셋)
-- 결제 완료 콜백이 위치한 클래스/파일: (예: `IAPManager.cs`, `ShopManager.cs`)
-
-### 4. 광고 (Ad) 연동 대상 (광고가 있는 경우)
-- 사용하는 광고 네트워크/미디에이션: (예: AppLovin MAX, IronSource, Google AdMob, Unity Ads, 없음)
-- 하이브로 자사 광고(`HighbrowAd.Show`) 사용 여부: (예: 사용 / 미사용)
-- 광고 콜백이 위치한 클래스/파일: (예: `AdManager.cs`)
-
-### 5. 세션 하트비트 추적 방식
-- [ ] **(A) SDK 자동 추적 (기본 권장):** `AutoSessionTracking = true`로 설정 (유저 `TrackAuth` 성공 1초 후부터 백그라운드 2분 주기 자동 전송 시작)
-- [ ] **(B) 수동 제어:** 특정 씬(로비 등) 진입 시 `HighbrowLog.StartSessionTracking()` / 로그아웃 시 `StopSessionTracking()` 직접 호출
-
-> **알림:**
-> 1. `TrackAuth`에서 입력된 `SUID`, `AccountId`, `AccountType`, `DUID`는 SDK 내부에 자동 캐싱되므로, 이후 결제(`TrackPurchase`), 광고(`TrackAd`), 세션(`Alive`)에서 개발자가 ID를 다시 전달할 필요가 없습니다.
-> 2. 신규 유저(New User), 첫 결제(First Purchase), DAU/DADU 지표는 하이브로 중계 수집 서버가 자체 DB를 통해 100% 자동 집계하므로 클라이언트에서 별도로 연동할 필요가 없습니다.
-
----
-
-## Phase 2 ~ Phase 4 실행 가이드라인 (AI 내부 지침)
-
-- **사전 질문 응답을 받기 전까지는 절대 프로젝트 파일을 수정하지 마세요.**
-- 개발자가 질문에 답변하면, 답변을 분석하여:
-  1. SDK 초기화 코드 (`HighbrowSDK.Initialize(...)`) 구성 (UseSandbox 설정 및 프로젝트 내 원스토어/구글 등 빌드 심볼을 고려한 `config.Market` 동적 분기 코드 포함)
-  2. 수정 대상 파일 및 삽입 위치 목록
-  3. `TrackAuth`, `TrackPurchase`, `TrackAd`, `SessionTracking` 적용 계획
-  을 작성해 보여주고, **"이 계획대로 연동을 진행할까요? (Yes / 수정 요청)"**을 물어보세요.
-- 국가 코드(Country)는 디바이스 Locale에서 SDK가 자동 추출하므로 개발자에게 입력을 요구하지 마세요.
-- 승인을 받은 후에만 `using Highbrow.Core;`, `using Highbrow.Log;`, `using Highbrow.Ad;`를 추가하고 코드를 안전하게 삽입하세요.
-```
+AI가 프로젝트 내의 초기화, 로그인(`TrackAuth`), 인앱 결제(`TrackPurchase`), 광고(`TrackAd`) 위치를 스스로 탐색하고, 맞춤형 연동 계획을 제시한 후 안전하게 코드를 자동 삽입합니다.
 
 ---
 
@@ -160,6 +102,7 @@ public class GameInitializer : MonoBehaviour
             EnableLog = true,                           // 로그 모듈 활성화
             AutoSessionTracking = true,                 // 2분 주기 세션 하트비트(Alive) 자동 활성화
             SessionIntervalSeconds = 120f,              // 세션 로그 주기 (기본 120초 = 2분)
+            HttpTimeoutSeconds = 10,                    // HTTP 요청 타임아웃 (3~30초 범위 자동 클램프)
             MaxOfflineQueueSize = 300,                  // 오프라인 캐시 최대 개수
             FlushRetryIntervalSeconds = 30f,            // 오프라인 큐 재전송 주기 (초)
             DebugMode = false,                          // 상용 배포 시 false 지정
@@ -167,6 +110,9 @@ public class GameInitializer : MonoBehaviour
         };
 
         HighbrowSDK.Initialize(config);
+
+        // 또는 인스펙터 GUI(Highbrow > SDK Settings)를 사용하는 경우 한 줄로 초기화 가능:
+        // HighbrowSDK.Initialize();
     }
 }
 ```

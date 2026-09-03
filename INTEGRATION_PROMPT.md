@@ -1,65 +1,149 @@
 # HighbrowSDK AI Master Integration Prompt
-> **안내:** 파트너사 개발자는 아래 마크다운 블록의 내용을 전체 복사하여 **Cursor Composer, GitHub Copilot Chat, Claude** 등의 AI 채팅창에 그대로 붙여넣으세요.  
-> AI가 프로젝트 상황을 사전에 질문하고, 답변에 맞춘 최적의 연동 계획을 승인받은 뒤 안전하게 순차적으로 코드를 적용합니다.
+> **외부 개발사 안내:**<br>
+> Cursor Composer, GitHub Copilot Chat, Claude Code, Windsurf 등의 AI 어시스턴트에게 다음 한 줄을 입력하세요:<br>
+> **`"INTEGRATION_PROMPT.md를 읽고 우리 프로젝트에 HighbrowSDK를 연동해줘"`**
 
 ---
 
 ```markdown
 # Role & Objective
-당신은 10년 차 이상의 Unity/C# 클라이언트 아키텍트이자 데이터 엔지니어입니다.
-현재 열려 있는 Unity 프로젝트에 `HighbrowSDK` (로그 수집 및 코어 모듈)를 연동하는 작업을 수행합니다.
+당신은 10년 차 이상의 Unity/C# 시니어 클라이언트 아키텍트이자 데이터 엔지니어입니다.
+외부 파트너 게임 프로젝트에 `HighbrowSDK` (v1.3.0)를 안전하고 결함 없이 연동하는 임무를 맡았습니다.
 
-# Workflow & Execution Rules (엄격 준수)
-1. **[중요] 즉시 코드를 수정하지 마세요.**
-2. **Phase 1 (사전 질문):** 먼저 아래 [사전 질문 체크리스트]를 개발자에게 질문하고 응답을 기다리세요.
-3. **Phase 2 (계획 승인):** 개발자의 답변을 바탕으로 수정할 파일 목록과 구체적인 연동 계획(Integration Plan)을 정리하여 개발자에게 제시하고, **개발자의 명시적 승인("진행", "Proceed" 등)**을 받으세요.
-4. **Phase 3 (순차 실행):** 승인을 받은 후, Step 1(초기화)부터 순차적으로 최소 변경(Surgical Changes) 원칙을 지키며 기존 코드를 수정하세요.
-5. **Phase 4 (검증):** 연동 완료 후 컴파일 체크 및 테스트 확인 지침을 제공하세요.
-
----
-
-## Phase 1: 사전 질문 체크리스트 (개발자에게 이 질문을 출력하세요)
-
-프로젝트 환경과 여건에 맞게 안전하게 연동하기 위해 다음 질문에 답변해 주세요:
-
-### 1. SDK 기본 정보 및 환경 모드
-- 하이브로 발급 **AppKey**: (예: `YOUR_APP_KEY`)
-- 테스트/배포 모드:
-  - [ ] **(A) 개발/테스트 모드:** `UseSandbox = true` (샌드박스 수집 서버로 자동 전송)
-  - [ ] **(B) 라이브 상용 배포:** `UseSandbox = false` (Production 수집 서버로 자동 전송)
-
-### 2. 유저 식별자 (SUID) 및 로그인
-- 게임 내 유저 고유 ID(SUID) 변수명 또는 획득 경로: (예: `userSeq`, `FirebaseUser.UserId`, `uuid` 등)
-- 지원하는 소셜/인증 수단: (예: Google, Apple, Guest, Facebook 등)
-- 로그인 성공 콜백이 위치한 클래스/파일: (예: `LoginManager.cs`, `TitleScene.cs`)
-
-### 3. 인앱 결제 (IAP) 연동 대상
-- 사용하는 IAP 플러그인: (예: Unity IAP `IStoreListener`, 자체 결제, 기타 에셋)
-- 결제 완료 콜백이 위치한 클래스/파일: (예: `IAPManager.cs`, `ShopManager.cs`)
-
-### 4. 광고 (Ad) 연동 대상 (광고가 있는 경우)
-- 사용하는 광고 네트워크/미디에이션: (예: AppLovin MAX, IronSource, Google AdMob, Unity Ads, 없음)
-- 하이브로 자사 광고(`HighbrowAd.Show`) 사용 여부: (예: 사용 / 미사용)
-- 광고 콜백이 위치한 클래스/파일: (예: `AdManager.cs`)
-
-### 5. 세션 하트비트 추적 방식
-- [ ] **(A) SDK 자동 추적 (기본 권장):** `AutoSessionTracking = true`로 설정 (유저 `TrackAuth` 성공 1초 후부터 백그라운드 2분 주기 자동 전송 시작)
-- [ ] **(B) 수동 제어:** 특정 씬(로비 등) 진입 시 `HighbrowLog.StartSessionTracking()` / 로그아웃 시 `StopSessionTracking()` 직접 호출
-
-> **알림:** 
-> 1. `TrackAuth`에서 입력된 `SUID`, `AccountId`, `AccountType`, `DUID`는 SDK 내부에 자동 캐싱되므로, 이후 결제(`TrackPurchase`), 광고(`TrackAd`), 세션(`Alive`)에서 개발자가 ID를 다시 전달할 필요가 없습니다.
-> 2. 신규 유저(New User), 첫 결제(First Purchase), DAU/DADU 지표는 하이브로 중계 수집 서버가 자체 DB를 통해 100% 자동 집계하므로 클라이언트에서 별도로 연동할 필요가 없습니다.
+# Core Architecture & Golden Rules (엄격 준수)
+1. **외과 수술적 수정(Surgical Edits Only):**
+   - 파트너사의 기존 게임 로직, 로그인 처리부, 인앱 결제 흐름, 광고 콜백을 리팩토링하거나 구조를 바꾸지 마세요.
+   - 오직 성공/완료 시점의 정확한 위치에 `HighbrowLog.Track...()` 호출 한 줄만 안전하게 삽입하세요.
+2. **모듈 네임스페이스:**
+   - 코어: `using Highbrow.Core;`
+   - 로그: `using Highbrow.Log;`
+   - 자사 광고(선택): `using Highbrow.Ad;`
+3. **4대 핵심 팩트 로그(Fact Logs) 원칙:**
+   - 클라이언트는 오직 4개의 사실(Fact) 로그만 전송합니다: `TrackAuth`, `Alive`(자동), `TrackPurchase`, `TrackAd`.
+   - **신규 유저(New User), 첫 결제(First Purchase), DAU/DADU 집계 로직을 클라이언트에 직접 작성하지 마세요.** 하이브로/해긴 백엔드가 DB를 통해 100% 자동 산출합니다.
+4. **ID 자동 캐싱:**
+   - `TrackAuth` 호출 시 입력된 `SUID`, `AccountId`, `AccountType`, `DUID`는 SDK 내부에 자동 캐싱됩니다.
+   - 이후 결제(`TrackPurchase`), 광고(`TrackAd`), 세션(`Alive`)에서 SUID를 다시 지정하지 않아도 자동으로 캐시된 값이 주입됩니다.
 
 ---
 
-## Phase 2 ~ Phase 4 실행 가이드라인 (AI 내부 지침)
+# Workflow (4단계 절차)
 
-- **사전 질문 응답을 받기 전까지는 절대 프로젝트 파일을 수정하지 마세요.**
-- 개발자가 질문에 답변하면, 답변을 분석하여:
-  1. SDK 초기화 코드 (`HighbrowSDK.Initialize(...)`) 구성 (UseSandbox 설정 및 프로젝트 내 원스토어/구글 등 빌드 심볼을 고려한 `config.Market` 동적 분기 코드 포함)
-  2. 수정 대상 파일 및 삽입 위치 목록
-  3. `TrackAuth`, `TrackPurchase`, `TrackAd`, `SessionTracking` 적용 계획
-  을 작성해 보여주고, **"이 계획대로 연동을 진행할까요? (Yes / 수정 요청)"**을 물어보세요.
-- 국가 코드(Country)는 디바이스 Locale에서 SDK가 자동 추출하므로 개발자에게 입력을 요구하지 마세요.
-- 승인을 받은 후에만 `using Highbrow.Core;`, `using Highbrow.Log;`, `using Highbrow.Ad;`를 추가하고 코드를 안전하게 삽입하세요.
+## Phase 1. 프로젝트 코드베이스 탐색 (Research)
+코드를 수정하기 전에 프로젝트 구조를 검색하여 아래 4대 연동 지점을 파악하세요:
+1. **초기화 진입점:** 게임 시작 시 최초 1회 실행되는 초기화/부트스트랩 스크립트 (예: `GameInitializer.cs`, `TitleManager.cs`, `SplashManager.cs` 등)
+2. **로그인/인증 성공 지점:** 게스트, 구글, 애플 등 로그인 완료 후 유저 고유 ID(SUID)를 받는 콜백
+3. **인앱 결제(IAP) 성공 지점:** Unity IAP `ProcessPurchase(PurchaseEventArgs args)` 또는 자체 결제 검증 완료 콜백
+4. **광고 시청 완료 지점 (해당 시):** AppLovin MAX, IronSource, AdMob, Unity Ads 등의 보상형/전면 광고 완료 콜백
+
+## Phase 2. 연동 계획서 제시 및 개발자 승인 (Plan & Approval)
+탐색한 내용을 바탕으로 수정할 파일과 삽입할 코드 스니펫을 개발자에게 보여주고, **"이 계획대로 연동을 진행할까요? (Yes / 수정 요청)"**을 확인받으세요.
+
+## Phase 3. 순차적 코드 삽입 (Implementation)
+
+### [Step 1] SDK 초기화
+게임 시작 씬의 Awake/Start에서 초기화합니다.
+- **방법 A (권장 - 인스펙터 기반):**
+  Unity Editor 메뉴 `Highbrow > SDK Settings`에서 `AppKey`, `Market`, `UseSandbox`를 설정한 경우 단 한 줄로 초기화:
+  ```csharp
+  using Highbrow.Core;
+
+  HighbrowSDK.Initialize();
+  ```
+- **방법 B (코드 기반 동적 설정):**
+  ```csharp
+  using Highbrow.Core;
+  using Highbrow.Log;
+
+  MarketType targetMarket = MarketType.None;
+  #if UNITY_IOS
+  targetMarket = MarketType.AppleStore;
+  #elif UNITY_ANDROID
+      #if ONESTORE
+      targetMarket = MarketType.OneStore;
+      #elif SAMSUNG || SAMSUNG_STORE
+      targetMarket = MarketType.SamsungStore;
+      #else
+      targetMarket = MarketType.GooglePlay;
+      #endif
+  #elif UNITY_STANDALONE_WIN
+  targetMarket = MarketType.Steam;
+  #endif
+
+  HighbrowConfig config = new HighbrowConfig
+  {
+      AppKey = "PARTNER_APP_KEY",          // 하이브로 발급 AppKey
+      Market = targetMarket,               // 타겟 마켓
+      UseSandbox = false,                  // false: 상용, true: 개발/테스트
+      EnableLog = true,
+      AutoSessionTracking = true,         // 2분 주기 세션 하트비트 자동 활성화
+      SessionIntervalSeconds = 120f,
+      HttpTimeoutSeconds = 10              // 네트워크 타임아웃 (3~30초 자동 보정)
+  };
+
+  HighbrowSDK.Initialize(config);
+  ```
+
+### [Step 2] 로그인/인증 완료 연동 (`TrackAuth`)
+유저 로그인 성공 콜백 최상단/최하단에 호출합니다:
+```csharp
+using Highbrow.Log;
+
+// 로그인 성공 시점
+HighbrowLog.TrackAuth(
+    suid: userUniqueId,                  // 게임 유저 고유 ID (문자열) - 필수!
+    accountId: socialAccountId,          // 구글 sub ID, 애플 user ID 등
+    accountType: AccountType.GooglePlay, // GooglePlay, AppleId, Guest, Facebook 등
+    nickname: userNickname,              // 닉네임 (없으면 string.Empty)
+    result: "OK"                         // 인증 결과 (기본 "OK")
+);
+
+// (선택) 인게임 서버에서 판정한 국가 코드가 있다면 즉시 덮어쓰기 가능:
+// HighbrowLog.SetCountry("KR");
+```
+> **주의:** SUID가 누락되거나 빈 문자열이면 지표가 오염되므로, 반드시 유저를 식별할 수 있는 유효한 문자열을 전달하세요.
+
+### [Step 3] 인앱 결제 완료 연동 (`TrackPurchase`)
+결제 성공/영수증 검증 완료 콜백(예: Unity IAP `ProcessPurchase`)에 호출합니다:
+```csharp
+using Highbrow.Log;
+
+// Unity IAP 예시
+public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs args)
+{
+    // 기존 결제 처리 로직 유지...
+
+    // HighbrowSDK 결제 로그 연동
+    // receiptId에는 args.purchasedProduct.transactionID 또는 args.purchasedProduct.receipt 전달 가능 (SDK 내부 자동 정제)
+    HighbrowLog.TrackPurchase(
+        receiptId: args.purchasedProduct.transactionID,
+        price: (float)args.purchasedProduct.metadata.localizedPrice,
+        priceId: args.purchasedProduct.definition.id,
+        productId: internalNumericId,     // 게임 내부 숫자 상품 ID (없으면 0)
+        productName: args.purchasedProduct.metadata.localizedTitle
+    );
+
+    return PurchaseProcessingResult.Complete;
+}
+```
+
+### [Step 4] 광고 시청 완료 연동 (`TrackAd`)
+광고 리워드 지급 또는 전면 광고 종료 콜백에 호출합니다:
+```csharp
+using Highbrow.Log;
+
+// 보상형 동영상 광고 완료 시
+HighbrowLog.TrackAd(AdType.RewardVideo);
+
+// 전면 광고 시청 완료 시
+HighbrowLog.TrackAd(AdType.Interstitial);
+
+// 배너 광고 노출 시
+HighbrowLog.TrackAd(AdType.Banner);
+```
+
+## Phase 4. 최종 검증 (Verification)
+1. 컴파일 에러가 없는지 확인합니다.
+2. Unity Editor를 실행했을 때 콘솔에 아래와 같은 1회성 초기화 완료 로그가 뜨는지 확인하도록 안내하세요:
+   `[HighbrowSDK] Initialized v1.3.0 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
 ```

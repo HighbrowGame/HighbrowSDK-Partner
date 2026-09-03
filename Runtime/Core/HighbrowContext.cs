@@ -12,6 +12,7 @@ namespace Highbrow.Core
     {
         private const string PrefsDuidKey = "HIGHBROW_SDK_SAVED_DUID";
         private static string cachedDuid;
+        private static string cachedCountry;
 
         /// <summary>
         /// Returns current UTC timestamp formatted as ISO 8601 string (e.g. 2026-08-31T11:29:44.123456Z).
@@ -104,6 +105,14 @@ namespace Highbrow.Core
                 return customMarket.Value;
             }
 
+#if ONESTORE || ONE_STORE
+            return 4; // OneStore
+#elif SAMSUNG || SAMSUNG_STORE || GALAXY_STORE
+            return 5; // SamsungStore
+#elif STEAM
+            return 3; // Steam
+#endif
+
             switch (Application.platform)
             {
                 case RuntimePlatform.IPhonePlayer:
@@ -120,18 +129,87 @@ namespace Highbrow.Core
         }
 
         /// <summary>
+        /// Manually sets and caches the user country code (e.g. from game server authentication).
+        /// Must be a 2-letter ISO country code (e.g. "KR", "US", "JP").
+        /// </summary>
+        public static void SetCachedCountry(string countryCode)
+        {
+            if (!string.IsNullOrEmpty(countryCode))
+            {
+                string trimmed = countryCode.Trim().ToUpperInvariant();
+                if (trimmed.Length == 2 && char.IsLetter(trimmed[0]) && char.IsLetter(trimmed[1]))
+                {
+                    cachedCountry = trimmed;
+                    return;
+                }
+            }
+
+            cachedCountry = null;
+        }
+
+        /// <summary>
+        /// Clears the cached country code, allowing re-detection.
+        /// </summary>
+        public static void ClearCachedCountry()
+        {
+            cachedCountry = null;
+        }
+
+        /// <summary>
         /// Resolves 2-letter ISO Country code (e.g. "KR", "US", "JP", "GB", "TW").
-        /// Extracts accurate country code from OS RegionInfo or CultureInfo locale without language guessing.
+        /// Prioritizes developer override, cached code, Android OS native Locale JNI, .NET RegionInfo,
+        /// CultureInfo (CurrentCulture/CurrentUICulture), and safe Unity SystemLanguage mapping.
         /// If undetectable, returns empty string so the collector server Geo-IP can inject the true IP country.
         /// </summary>
         public static string GetCountry(string customCountry = null)
         {
             if (!string.IsNullOrEmpty(customCountry))
             {
-                return customCountry.ToUpperInvariant();
+                string trimmed = customCountry.Trim().ToUpperInvariant();
+                if (trimmed.Length == 2 && char.IsLetter(trimmed[0]) && char.IsLetter(trimmed[1]))
+                {
+                    return trimmed;
+                }
             }
 
-            // 1. Try .NET RegionInfo (OS Device Region Setting)
+            if (!string.IsNullOrEmpty(cachedCountry))
+            {
+                return cachedCountry;
+            }
+
+            string resolved = ResolveSystemCountry();
+            if (!string.IsNullOrEmpty(resolved))
+            {
+                cachedCountry = resolved;
+                return cachedCountry;
+            }
+
+            return string.Empty;
+        }
+
+        private static string ResolveSystemCountry()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            // 1. Android OS Native Locale JNI (100% reliable on Android IL2CPP)
+            try
+            {
+                using (var localeClass = new AndroidJavaClass("java.util.Locale"))
+                using (var defaultLocale = localeClass.CallStatic<AndroidJavaObject>("getDefault"))
+                {
+                    string country = defaultLocale.Call<string>("getCountry");
+                    if (!string.IsNullOrEmpty(country) && country.Length == 2 && char.IsLetter(country[0]) && char.IsLetter(country[1]))
+                    {
+                        return country.ToUpperInvariant();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                HighbrowLogger.LogWarning($"[HighbrowContext] Android native Locale check failed: {ex.Message}");
+            }
+#endif
+
+            // 2. .NET RegionInfo (OS Device Region Setting)
             try
             {
                 RegionInfo currentRegion = RegionInfo.CurrentRegion;
@@ -142,29 +220,45 @@ namespace Highbrow.Core
             }
             catch
             {
-                // Fallback to CultureInfo
+                // Managed stripping fallback
             }
 
-            // 2. Try CultureInfo.CurrentCulture ("ko-KR", "en-US", "zh-TW", "en-GB", etc.)
-            try
+            // 3. CultureInfo (CurrentCulture, CurrentUICulture, InstalledUICulture) BCP-47 tags
+            CultureInfo[] candidateCultures = { CultureInfo.CurrentCulture, CultureInfo.CurrentUICulture, CultureInfo.InstalledUICulture };
+            foreach (var culture in candidateCultures)
             {
-                CultureInfo currentCulture = CultureInfo.CurrentCulture;
-                if (currentCulture != null && !string.IsNullOrEmpty(currentCulture.Name))
+                if (culture == null || string.IsNullOrEmpty(culture.Name)) continue;
+                try
                 {
-                    string[] parts = currentCulture.Name.Split('-');
+                    string[] parts = culture.Name.Split(new[] { '-', '_' }, StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length > 1 && parts[parts.Length - 1].Length == 2)
                     {
-                        return parts[parts.Length - 1].ToUpperInvariant();
+                        string candidate = parts[parts.Length - 1].ToUpperInvariant();
+                        if (char.IsLetter(candidate[0]) && char.IsLetter(candidate[1]))
+                        {
+                            return candidate;
+                        }
                     }
                 }
-            }
-            catch
-            {
-                // Unresolvable locale
+                catch { }
             }
 
-            // 3. Fallback: Return empty string to let collector server inject accurate Country from IP header (Cloudflare / CloudFront Geo-IP)
-            return string.Empty;
+            // 4. Safe Unity SystemLanguage mapping (only for unambiguous 1:1 language-to-country mappings)
+            switch (Application.systemLanguage)
+            {
+                case SystemLanguage.Korean: return "KR";
+                case SystemLanguage.Japanese: return "JP";
+                case SystemLanguage.ChineseSimplified: return "CN";
+                case SystemLanguage.ChineseTraditional: return "TW";
+                case SystemLanguage.Vietnamese: return "VN";
+                case SystemLanguage.Thai: return "TH";
+                case SystemLanguage.Indonesian: return "ID";
+                case SystemLanguage.Russian: return "RU";
+                case SystemLanguage.Turkish: return "TR";
+                default:
+                    // Multi-country languages (English, Spanish, etc.) defer to server Geo-IP to avoid skewing metrics
+                    return string.Empty;
+            }
         }
 
         /// <summary>

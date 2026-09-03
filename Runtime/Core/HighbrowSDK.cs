@@ -11,7 +11,7 @@ namespace Highbrow.Core
     /// </summary>
     public static class HighbrowSDK
     {
-        public const string SdkVersion = "1.2.3";
+        public const string SdkVersion = "1.3.0";
 
         private static readonly Dictionary<Type, IHighbrowModule> registeredModules = new Dictionary<Type, IHighbrowModule>();
         private static HighbrowConfig activeConfig;
@@ -38,51 +38,88 @@ namespace Highbrow.Core
         public static event Action<bool> OnInitialized;
 
         /// <summary>
+        /// Initializes Highbrow SDK using the HighbrowSettings ScriptableObject asset
+        /// located in Resources/Highbrow/HighbrowSettings.
+        /// If asset is missing, safely falls back to default configuration.
+        /// </summary>
+        public static void Initialize()
+        {
+            HighbrowSettings settings = HighbrowSettings.LoadSettings();
+            if (settings == null)
+            {
+                HighbrowLogger.LogWarning("[HighbrowSDK] HighbrowSettings asset not found in Resources/Highbrow. Initializing with default HighbrowConfig fallback.");
+                Initialize(new HighbrowConfig());
+                return;
+            }
+
+            Initialize(settings.ToConfig());
+        }
+
+        /// <summary>
         /// Initializes Highbrow SDK with the given configuration.
         /// Automatically discovers and initializes active modules based on config.
         /// </summary>
         /// <param name="config">Configuration instance.</param>
         public static void Initialize(HighbrowConfig config)
         {
-            if (config == null)
+            try
             {
-                HighbrowLogger.LogError("Cannot initialize HighbrowSDK with null configuration.");
-                OnInitialized?.Invoke(false);
-                return;
-            }
+                if (config == null)
+                {
+                    HighbrowLogger.LogError("Cannot initialize HighbrowSDK with null configuration.");
+                    OnInitialized?.Invoke(false);
+                    return;
+                }
 
-            if (isInitialized)
-            {
-                HighbrowLogger.LogWarning("HighbrowSDK is already initialized. Skipping duplicate call.");
+                if (!config.Validate(out string validationError))
+                {
+                    HighbrowLogger.LogError($"[HighbrowSDK] Configuration validation failed: {validationError}");
+                    OnInitialized?.Invoke(false);
+                    return;
+                }
+
+                if (isInitialized)
+                {
+                    HighbrowLogger.LogWarning("HighbrowSDK is already initialized. Skipping duplicate call.");
+                    OnInitialized?.Invoke(true);
+                    return;
+                }
+
+                activeConfig = config;
+                HighbrowLogger.DebugMode = config.DebugMode;
+
+                // Ensure lifecycle dispatcher is active
+                HighbrowDispatcher.EnsureCreated();
+
+                HighbrowLogger.Log($"Initializing Highbrow SDK Core v{SdkVersion} (Sandbox: {config.UseSandbox}, Market: {config.Market}, AppKey: {MaskKey(config.AppKey)})");
+
+                // Initialize registered modules
+                foreach (var kvp in registeredModules)
+                {
+                    try
+                    {
+                        kvp.Value.Initialize(activeConfig);
+                        HighbrowLogger.Log($"Module [{kvp.Value.ModuleName}] initialized successfully.");
+                    }
+                    catch (Exception ex)
+                    {
+                        HighbrowLogger.LogError($"Error initializing module [{kvp.Value.ModuleName}]: {ex.Message}");
+                    }
+                }
+
+                isInitialized = true;
                 OnInitialized?.Invoke(true);
-                return;
+
+                // Unconditional 1-line confirmation feedback log for developer assurance
+                string marketStr = ((MarketType)HighbrowContext.GetMarketType(activeConfig.Market)).ToString();
+                string countryStr = HighbrowContext.GetCountry(activeConfig.CustomCountry);
+                Debug.Log($"[HighbrowSDK] Initialized v{SdkVersion} successfully. (Mode: {activeConfig.ServerMode}, Market: {marketStr}, Country: {(string.IsNullOrEmpty(countryStr) ? "Auto" : countryStr)})");
             }
-
-            activeConfig = config;
-            HighbrowLogger.DebugMode = config.DebugMode;
-
-            // Ensure lifecycle dispatcher is active
-            HighbrowDispatcher.EnsureCreated();
-
-            HighbrowLogger.Log($"Initializing Highbrow SDK Core v{SdkVersion} (Sandbox: {config.UseSandbox}, Market: {config.Market}, AppKey: {MaskKey(config.AppKey)})");
-
-            // Initialize registered modules
-            foreach (var kvp in registeredModules)
+            catch (Exception ex)
             {
-                try
-                {
-                    kvp.Value.Initialize(activeConfig);
-                    HighbrowLogger.Log($"Module [{kvp.Value.ModuleName}] initialized successfully.");
-                }
-                catch (Exception ex)
-                {
-                    HighbrowLogger.LogError($"Error initializing module [{kvp.Value.ModuleName}]: {ex.Message}");
-                }
+                Debug.LogError($"[HighbrowSDK] Fatal error during initialization: {ex.Message}");
+                OnInitialized?.Invoke(false);
             }
-
-            isInitialized = true;
-            OnInitialized?.Invoke(true);
-            HighbrowLogger.Log("HighbrowSDK initialization completed.");
         }
 
         /// <summary>

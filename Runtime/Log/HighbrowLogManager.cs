@@ -75,7 +75,7 @@ namespace Highbrow.Log
             }
 
             config = sdkConfig ?? new HighbrowConfig();
-            httpClient = new HighbrowHttpClient(dumpHttpPayload: config.DumpHttpPayload);
+            httpClient = new HighbrowHttpClient(config.HttpTimeoutSeconds, config.DumpHttpPayload);
             offlineQueue = new HighbrowOfflineQueue(config.MaxOfflineQueueSize);
 
             IsInitialized = true;
@@ -136,6 +136,17 @@ namespace Highbrow.Log
         }
 
         /// <summary>
+        /// Explicitly sets and caches the active country code (e.g. from server authentication response).
+        /// Must be a 2-letter ISO code (e.g. "KR", "US", "JP").
+        /// </summary>
+        public void SetCountry(string countryCode)
+        {
+            HighbrowContext.SetCachedCountry(countryCode);
+            string current = HighbrowContext.GetCountry();
+            HighbrowLogger.Log($"Country code explicitly updated to: '{(string.IsNullOrEmpty(current) ? "Auto-Detect / Server Geo-IP" : current)}'");
+        }
+
+        /// <summary>
         /// Clears active user context and stops alive session tracking. Call on logout / account switch.
         /// </summary>
         public void ClearUser()
@@ -165,30 +176,37 @@ namespace Highbrow.Log
         /// <param name="ipAddress">Optional user IP address.</param>
         public void TrackAuth(string suid, string accountId, AccountType accountType, string nickname, string duid = null, string result = "OK", string ipAddress = null)
         {
-            SetUserInfo(suid, accountId, accountType, duid);
-
-            AuthLog log = new AuthLog
+            try
             {
-                Time = HighbrowContext.GetUtcNowIsoString(),
-                AccountType = (int)accountType,
-                AccountId = accountId ?? string.Empty,
-                Suid = ResolveSuid(suid),
-                Duid = ResolveDuid(),
-                Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
-                Os = HighbrowContext.GetOsType(),
-                Country = HighbrowContext.GetCountry(config?.CustomCountry),
-                IpAddress = ipAddress ?? string.Empty,
-                Nickname = nickname ?? string.Empty,
-                DeviceInfo = HighbrowContext.GetDeviceInfo(),
-                Result = result ?? "OK"
-            };
+                SetUserInfo(suid, accountId, accountType, duid);
 
-            SendLog(PathLogAuth, "LogAuth", JsonUtility.ToJson(log));
+                AuthLog log = new AuthLog
+                {
+                    Time = HighbrowContext.GetUtcNowIsoString(),
+                    AccountType = (int)accountType,
+                    AccountId = accountId ?? string.Empty,
+                    Suid = ResolveSuid(suid),
+                    Duid = ResolveDuid(),
+                    Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
+                    Os = HighbrowContext.GetOsType(),
+                    Country = HighbrowContext.GetCountry(config?.CustomCountry),
+                    IpAddress = ipAddress ?? string.Empty,
+                    Nickname = nickname ?? string.Empty,
+                    DeviceInfo = HighbrowContext.GetDeviceInfo(),
+                    Result = result ?? "OK"
+                };
 
-            // Haegin requirement: Start Alive session tracking shortly after successful Auth
-            if (config != null && config.AutoSessionTracking)
+                SendLog(PathLogAuth, "LogAuth", JsonUtility.ToJson(log));
+
+                // Haegin requirement: Start Alive session tracking shortly after successful Auth
+                if (config != null && config.AutoSessionTracking)
+                {
+                    StartSessionTrackingWithDelay(1f, config.SessionIntervalSeconds > 0 ? config.SessionIntervalSeconds : 120f);
+                }
+            }
+            catch (Exception ex)
             {
-                StartSessionTrackingWithDelay(1f, config.SessionIntervalSeconds > 0 ? config.SessionIntervalSeconds : 120f);
+                HighbrowLogger.LogError($"[HighbrowLog] Unexpected error in TrackAuth: {ex.Message}");
             }
         }
 
@@ -209,27 +227,34 @@ namespace Highbrow.Log
         /// <param name="suid">Optional SUID override.</param>
         public void TrackPurchase(string receiptId, float price, string priceId, int productId, string productName, DateTime? purchaseTime = null, string suid = null)
         {
-            DateTime pTime = purchaseTime ?? DateTime.UtcNow;
-            string targetSuid = ResolveSuid(suid);
-
-            StoreReceiptLog log = new StoreReceiptLog
+            try
             {
-                Time = HighbrowContext.GetUtcNowIsoString(),
-                Suid = targetSuid,
-                ReceiptId = receiptId ?? string.Empty,
-                Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
-                Os = HighbrowContext.GetOsType(),
-                Country = HighbrowContext.GetCountry(config?.CustomCountry),
-                Price = price,
-                PriceId = priceId ?? string.Empty,
-                ProductId = productId,
-                ProductName = productName ?? string.Empty,
-                PurchaseTime = HighbrowContext.FormatUtcIsoString(pTime),
-                ClientVersion = HighbrowContext.GetClientVersion(config?.ClientVersion),
-                DeviceInfo = HighbrowContext.GetDeviceInfo()
-            };
+                DateTime pTime = purchaseTime ?? DateTime.UtcNow;
+                string targetSuid = ResolveSuid(suid);
 
-            SendLog(PathLogPurchase, "LogStoreReceipt", JsonUtility.ToJson(log));
+                StoreReceiptLog log = new StoreReceiptLog
+                {
+                    Time = HighbrowContext.GetUtcNowIsoString(),
+                    Suid = targetSuid,
+                    ReceiptId = SanitizeReceiptId(receiptId),
+                    Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
+                    Os = HighbrowContext.GetOsType(),
+                    Country = HighbrowContext.GetCountry(config?.CustomCountry),
+                    Price = price,
+                    PriceId = priceId ?? string.Empty,
+                    ProductId = productId,
+                    ProductName = productName ?? string.Empty,
+                    PurchaseTime = HighbrowContext.FormatUtcIsoString(pTime),
+                    ClientVersion = HighbrowContext.GetClientVersion(config?.ClientVersion),
+                    DeviceInfo = HighbrowContext.GetDeviceInfo()
+                };
+
+                SendLog(PathLogPurchase, "LogStoreReceipt", JsonUtility.ToJson(log));
+            }
+            catch (Exception ex)
+            {
+                HighbrowLogger.LogError($"[HighbrowLog] Unexpected error in TrackPurchase: {ex.Message}");
+            }
         }
 
         #endregion
@@ -244,20 +269,27 @@ namespace Highbrow.Log
         /// <param name="suid">Optional SUID override.</param>
         public void TrackAd(AdType adType, string customAdTypeName = null, string suid = null)
         {
-            string adTypeName = !string.IsNullOrEmpty(customAdTypeName) ? customAdTypeName : adType.ToString();
-
-            AdLog log = new AdLog
+            try
             {
-                Time = HighbrowContext.GetUtcNowIsoString(),
-                Suid = ResolveSuid(suid),
-                Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
-                Os = HighbrowContext.GetOsType(),
-                Country = HighbrowContext.GetCountry(config?.CustomCountry),
-                AdType = (int)adType,
-                AdTypeName = adTypeName
-            };
+                string adTypeName = !string.IsNullOrEmpty(customAdTypeName) ? customAdTypeName : adType.ToString();
 
-            SendLog(PathLogAd, "LogAd", JsonUtility.ToJson(log));
+                AdLog log = new AdLog
+                {
+                    Time = HighbrowContext.GetUtcNowIsoString(),
+                    Suid = ResolveSuid(suid),
+                    Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
+                    Os = HighbrowContext.GetOsType(),
+                    Country = HighbrowContext.GetCountry(config?.CustomCountry),
+                    AdType = (int)adType,
+                    AdTypeName = adTypeName
+                };
+
+                SendLog(PathLogAd, "LogAd", JsonUtility.ToJson(log));
+            }
+            catch (Exception ex)
+            {
+                HighbrowLogger.LogError($"[HighbrowLog] Unexpected error in TrackAd: {ex.Message}");
+            }
         }
 
         #endregion
@@ -498,7 +530,43 @@ namespace Highbrow.Log
             {
                 return explicitSuid;
             }
-            return !string.IsNullOrEmpty(currentSuid) ? currentSuid : string.Empty;
+
+            if (!string.IsNullOrEmpty(currentSuid))
+            {
+                return currentSuid;
+            }
+
+            HighbrowLogger.LogWarning("[HighbrowLog] Warning: Log emission has an EMPTY SUID! Please ensure TrackAuth is called upon login before sending purchase, ad, or session logs.");
+            return string.Empty;
+        }
+
+        private static string SanitizeReceiptId(string rawReceiptId)
+        {
+            if (string.IsNullOrEmpty(rawReceiptId)) return string.Empty;
+            string trimmed = rawReceiptId.Trim();
+
+            // Unity IAP defensive parsing: If developer passed the entire receipt JSON wrapper
+            // e.g. {"Store":"GooglePlay","TransactionID":"GPA.3312-...","Payload":"..."}
+            if (trimmed.StartsWith("{") && trimmed.EndsWith("}"))
+            {
+                try
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(
+                        trimmed,
+                        @"""(?:TransactionID|transactionId|orderId|order_id)""\s*:\s*""([^""]+)""",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                    );
+                    if (match.Success && !string.IsNullOrEmpty(match.Groups[1].Value))
+                    {
+                        HighbrowLogger.Log($"[HighbrowLog] Auto-extracted TransactionID '{match.Groups[1].Value}' from raw JSON receipt.");
+                        return match.Groups[1].Value;
+                    }
+                }
+                catch { }
+            }
+
+            // Safe length limit (max 128 chars) to protect Snowflake varchar schema from overflow
+            return trimmed.Length > 128 ? trimmed.Substring(0, 128) : trimmed;
         }
 
         private string ResolveDuid()

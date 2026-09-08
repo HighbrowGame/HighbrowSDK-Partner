@@ -77,12 +77,13 @@ namespace Highbrow.Samples
         }
 
         // 2. Called on in-app purchase success (Unity IAP ProcessPurchase, etc.)
-        public void OnPurchaseSuccess(string receiptId, float price, string priceId, int productId, string productName)
+        public void OnPurchaseSuccess(string receiptId, float price, string priceId, string currency, int productId, string productName)
         {
             HighbrowLog.TrackPurchase(
                 receiptId: receiptId,
                 price: price,
                 priceId: priceId,
+                currency: currency, // e.g. args.purchasedProduct.metadata.isoCurrencyCode ("KRW", "USD")
                 productId: productId,
                 productName: productName,
                 purchaseTime: DateTime.UtcNow

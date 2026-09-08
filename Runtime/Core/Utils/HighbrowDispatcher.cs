@@ -14,6 +14,25 @@ namespace Highbrow.Core.Utils
         private static HighbrowDispatcher instance;
         private static readonly object lockObject = new object();
         private static bool isQuitting = false;
+        private static int mainThreadId;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void CaptureMainThreadId()
+        {
+            mainThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+        }
+
+        /// <summary>
+        /// Gets whether the current executing thread is the Unity main thread.
+        /// </summary>
+        public static bool IsMainThread
+        {
+            get
+            {
+                if (mainThreadId == 0) return true;
+                return System.Threading.Thread.CurrentThread.ManagedThreadId == mainThreadId;
+            }
+        }
 
         private readonly Queue<Action> executionQueue = new Queue<Action>();
 
@@ -61,6 +80,7 @@ namespace Highbrow.Core.Utils
             }
 
             instance = this;
+            mainThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
             DontDestroyOnLoad(gameObject);
         }
 

@@ -76,7 +76,7 @@ namespace Highbrow.Core.Network
                 }
 
                 cachedData.Items.Add(new QueuedLogItem(logType, jsonPayload));
-                SaveQueueToPrefs();
+                SaveQueueToPrefs(true);
                 HighbrowLogger.Log($"Enqueued log to offline cache. Current queue count: {cachedData.Items.Count}");
             }
         }

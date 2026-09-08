@@ -97,12 +97,15 @@ HighbrowSDK.Initialize(config);
 
 ### 3) In-App Purchase (`TrackPurchase`)
 - **Call Location:** In the IAP receipt verification / purchase success callback (e.g. Unity IAP `ProcessPurchase`).
+- **Important:** Pass `args.purchasedProduct.transactionID` directly to `receiptId` (do not pass raw JSON receipt string).
+- **Prerequisite:** `TrackAuth` must be called upon login before sending purchase logs. Pending/Unconsumed purchase recovery must be executed after user login completes.
 - **Signature:**
   ```csharp
   HighbrowLog.TrackPurchase(
-      string receiptId,             // Apple transactionID or Google orderId
-      float price,                  // Product price (e.g. 0.99f)
+      string receiptId,             // Apple transactionID or Google orderId (required)
+      float price,                  // Product price (e.g. (float)args.purchasedProduct.metadata.localizedPrice)
       string priceId,               // Store item SKU (e.g. "com.game.gem_100")
+      string currency = "KRW",      // ISO 4217 Currency (e.g. args.purchasedProduct.metadata.isoCurrencyCode)
       int productId = 0,            // Internal numeric product ID (optional, default: 0)
       string productName = "",      // Product display name (optional, default: "")
       DateTime? purchaseTime = null,// Null defaults to DateTime.UtcNow

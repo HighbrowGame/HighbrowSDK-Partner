@@ -228,13 +228,14 @@ namespace Highbrow.Log
         /// Requires user to be authenticated via TrackAuth first.
         /// </summary>
         /// <param name="receiptId">Store receipt transaction ID (Apple transactionId / Google orderId).</param>
-        /// <param name="price">Product price in USD/local currency standard.</param>
+        /// <param name="price">Product price.</param>
         /// <param name="priceId">Store item identifier.</param>
+        /// <param name="currency">ISO 4217 Currency code (e.g. "KRW", "USD", "JPY"). Defaults to "KRW".</param>
         /// <param name="productId">Internal game product numeric ID (optional, default: 0).</param>
         /// <param name="productName">Product name string (optional, default: empty).</param>
         /// <param name="purchaseTime">Purchase timestamp (UTC). Defaults to UtcNow.</param>
         /// <param name="suid">Optional SUID override.</param>
-        public void TrackPurchase(string receiptId, float price, string priceId, int productId = 0, string productName = "", DateTime? purchaseTime = null, string suid = null)
+        public void TrackPurchase(string receiptId, float price, string priceId, string currency = "KRW", int productId = 0, string productName = "", DateTime? purchaseTime = null, string suid = null)
         {
             try
             {
@@ -247,17 +248,24 @@ namespace Highbrow.Log
                     return;
                 }
 
+                string sanitizedReceipt = SanitizeReceiptId(receiptId);
+                if (string.IsNullOrEmpty(sanitizedReceipt))
+                {
+                    return;
+                }
+
                 DateTime pTime = purchaseTime ?? DateTime.UtcNow;
 
                 StoreReceiptLog log = new StoreReceiptLog
                 {
                     Time = HighbrowContext.GetUtcNowIsoString(),
                     Suid = targetSuid,
-                    ReceiptId = SanitizeReceiptId(receiptId),
+                    ReceiptId = sanitizedReceipt,
                     Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
                     Os = HighbrowContext.GetOsType(),
                     Country = HighbrowContext.GetCountry(config?.CustomCountry),
                     Price = price,
+                    Currency = string.IsNullOrWhiteSpace(currency) ? "KRW" : currency.Trim().ToUpperInvariant(),
                     PriceId = priceId ?? string.Empty,
                     ProductId = productId,
                     ProductName = productName ?? string.Empty,
@@ -272,6 +280,14 @@ namespace Highbrow.Log
             {
                 HighbrowLogger.LogError($"[HighbrowLog] Unexpected error in TrackPurchase: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Backwards compatible overload for TrackPurchase with productId as 4th parameter.
+        /// </summary>
+        public void TrackPurchase(string receiptId, float price, string priceId, int productId, string productName = "", DateTime? purchaseTime = null, string suid = null)
+        {
+            TrackPurchase(receiptId, price, priceId, "KRW", productId, productName, purchaseTime, suid);
         }
 
         #endregion
@@ -605,7 +621,12 @@ namespace Highbrow.Log
 
         private static string SanitizeReceiptId(string rawReceiptId)
         {
-            if (string.IsNullOrEmpty(rawReceiptId)) return string.Empty;
+            if (string.IsNullOrWhiteSpace(rawReceiptId))
+            {
+                Debug.LogError("[HighbrowLog] TrackPurchase failed: 'receiptId' must not be null or empty. Please pass args.purchasedProduct.transactionID.");
+                return string.Empty;
+            }
+
             string trimmed = rawReceiptId.Trim();
 
             // Unwrap outer quotes if present (e.g. "\"{\\\"Store\\\":...}\"")
@@ -614,8 +635,7 @@ namespace Highbrow.Log
                 trimmed = trimmed.Substring(1, trimmed.Length - 2).Trim();
             }
 
-            // Unity IAP defensive parsing: If developer passed the entire receipt JSON wrapper or inner payload JSON
-            // Supports standard JSON and escaped JSON (\"orderId\": \"GPA...\"), plus OneStore txid/paymentId
+            // Unity IAP defensive parsing: If developer passed raw receipt JSON instead of transactionID
             if (trimmed.StartsWith("{") && trimmed.EndsWith("}"))
             {
                 try
@@ -630,16 +650,22 @@ namespace Highbrow.Log
                         HighbrowLogger.Log($"[HighbrowLog] Auto-extracted TransactionID '{match.Groups[1].Value}' from raw JSON receipt.");
                         return match.Groups[1].Value;
                     }
-                    else
-                    {
-                        HighbrowLogger.LogWarning("[HighbrowLog] Receipt was passed as JSON but failed to extract a transaction ID. Please pass args.purchasedProduct.transactionID directly.");
-                    }
                 }
                 catch { }
+
+                // Do NOT send raw JSON fragments to avoid corrupting Snowflake schema
+                Debug.LogError("[HighbrowLog] Invalid receiptId format: The receipt was passed as raw JSON, but failed to extract a transaction ID (orderId/transactionId/txid). Please pass args.purchasedProduct.transactionID directly.");
+                return string.Empty;
             }
 
             // Safe length limit (max 128 chars) to protect Snowflake varchar schema from overflow
-            return trimmed.Length > 128 ? trimmed.Substring(0, 128) : trimmed;
+            if (trimmed.Length > 128)
+            {
+                HighbrowLogger.LogWarning($"[HighbrowLog] ReceiptId length ({trimmed.Length}) exceeds 128 characters. Clamping to 128 chars.");
+                return trimmed.Substring(0, 128);
+            }
+
+            return trimmed;
         }
 
         private string ResolveDuid()

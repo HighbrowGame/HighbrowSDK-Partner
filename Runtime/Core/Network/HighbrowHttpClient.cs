@@ -61,7 +61,17 @@ namespace Highbrow.Core.Network
                 return;
             }
 
-            dispatcher.RunCoroutine(PostJsonCoroutine(endpointUrl, appKey, logType, jsonPayload, onComplete));
+            if (HighbrowDispatcher.IsMainThread)
+            {
+                dispatcher.RunCoroutine(PostJsonCoroutine(endpointUrl, appKey, logType, jsonPayload, onComplete));
+            }
+            else
+            {
+                dispatcher.Enqueue(() =>
+                {
+                    dispatcher.RunCoroutine(PostJsonCoroutine(endpointUrl, appKey, logType, jsonPayload, onComplete));
+                });
+            }
         }
 
         private IEnumerator PostJsonCoroutine(string endpointUrl, string appKey, string logType, string jsonPayload, Action<bool, long, string> onComplete)

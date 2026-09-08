@@ -60,6 +60,7 @@ namespace Highbrow.Ad
         private static int _totalPlayCount = 0;
         private bool _isFailed = false;
         private bool _hasPlaybackStarted = false;
+        private bool _isRewardClaimed = false;
 
         /// <summary>
         /// Indicates whether initialization or required component validation failed.
@@ -111,19 +112,6 @@ namespace Highbrow.Ad
                         AdsVideoPlayer.Stop();
                 }
                 catch { }
-            }
-
-            // Only invoke completion callback if playback actually started without failure
-            if (!_isFailed && _hasPlaybackStarted)
-            {
-                try
-                {
-                    onAdEndCallback?.Invoke();
-                }
-                catch (Exception ex)
-                {
-                    HighbrowLogger.LogError($"[HighbrowAdPlayer] Error invoking onAdEndCallback: {ex.Message}");
-                }
             }
         }
 
@@ -189,7 +177,7 @@ namespace Highbrow.Ad
         /// <returns>Spawned HighbrowAdPlayer component, or null on failure.</returns>
         public static HighbrowAdPlayer Show(Action onCompleted = null, Action onFailed = null, Canvas parentCanvas = null)
         {
-            EnsureEventSystem();
+            CheckEventSystem();
 
             GameObject prefab = Resources.Load<GameObject>(PREFAB_RESOURCE_PATH);
             if (prefab == null)
@@ -352,6 +340,19 @@ namespace Highbrow.Ad
 
         private void OnCloseClicked()
         {
+            if (!_isRewardClaimed)
+            {
+                _isRewardClaimed = true;
+                try
+                {
+                    onAdEndCallback?.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    HighbrowLogger.LogError($"[HighbrowAdPlayer] Error invoking onAdEndCallback: {ex.Message}");
+                }
+            }
+
             Destroy(gameObject);
         }
 
@@ -608,7 +609,7 @@ namespace Highbrow.Ad
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
         }
 
-        private static void EnsureEventSystem()
+        private static void CheckEventSystem()
         {
             if (EventSystem.current == null)
             {
@@ -619,11 +620,7 @@ namespace Highbrow.Ad
 #endif
                 if (existing == null)
                 {
-                    GameObject eventSystemObj = new GameObject("EventSystem");
-                    eventSystemObj.AddComponent<EventSystem>();
-                    eventSystemObj.AddComponent<StandaloneInputModule>();
-                    DontDestroyOnLoad(eventSystemObj);
-                    HighbrowLogger.Log("[HighbrowAdPlayer] No EventSystem found in scene. Created a default EventSystem for UI interactions.");
+                    HighbrowLogger.LogWarning("[HighbrowAdPlayer] No active EventSystem found in the scene. UI interactions (Skip button, etc.) require an EventSystem in your scene.");
                 }
             }
         }

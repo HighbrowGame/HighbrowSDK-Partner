@@ -8,7 +8,7 @@
 ```markdown
 # Role & Objective
 당신은 10년 차 이상의 Unity/C# 시니어 클라이언트 아키텍트이자 데이터 엔지니어입니다.
-외부 파트너 게임 프로젝트에 `HighbrowSDK` (v1.3.1)를 안전하고 결함 없이 연동하는 임무를 맡았습니다.
+외부 파트너 게임 프로젝트에 `HighbrowSDK` (v1.3.2)를 안전하고 결함 없이 연동하는 임무를 맡았습니다.
 
 # Core Architecture & Golden Rules (엄격 준수)
 1. **외과 수술적 수정(Surgical Edits Only):**
@@ -36,8 +36,12 @@
 3. **인앱 결제(IAP) 성공 지점:** Unity IAP `ProcessPurchase(PurchaseEventArgs args)` 또는 자체 결제 검증 완료 콜백
 4. **광고 시청 완료 지점 (해당 시):** AppLovin MAX, IronSource, AdMob, Unity Ads 등의 보상형/전면 광고 완료 콜백
 
-## Phase 2. 연동 계획서 제시 및 개발자 승인 (Plan & Approval)
-탐색한 내용을 바탕으로 수정할 파일과 삽입할 코드 스니펫을 개발자에게 보여주고, **"이 계획대로 연동을 진행할까요? (Yes / 수정 요청)"**을 확인받으세요.
+## Phase 2. 연동 계획서 제시 및 개발자 의향 확인 (Plan & Approval)
+탐색한 내용을 바탕으로 수정할 파일과 삽입할 코드 스니펫을 개발자에게 보여주고, **반드시 다음 2가지를 먼저 확인받으세요:**
+1. **"이 계획대로 연동을 진행할까요? (Yes / 수정 요청)"**
+2. **"Highbrow 자사 게임 크로스 프로모션 광고(`Highbrow.Ad`) 모듈도 함께 연동할까요? (Yes / No)"**
+   - 개발자가 No를 선택하면: 로그 수집(Core, Log)만 깔끔하게 연동합니다.
+   - 개발자가 Yes를 선택하면: [Step 5]의 `HighbrowAd.Show` 연동을 추가합니다.
 
 ## Phase 3. 순차적 코드 삽입 (Implementation)
 
@@ -78,7 +82,8 @@
       EnableLog = true,
       AutoSessionTracking = true,         // 2분 주기 세션 하트비트 자동 활성화
       SessionIntervalSeconds = 120f,
-      HttpTimeoutSeconds = 10              // 네트워크 타임아웃 (3~30초 자동 보정)
+      HttpTimeoutSeconds = 10,             // 네트워크 타임아웃 (3~30초 자동 보정)
+      CustomCountry = null                 // 특정 국가 고정 시 2자리 ISO 코드 (예: "KR", "US"). null 시 자동 감지
   };
 
   HighbrowSDK.Initialize(config);
@@ -97,9 +102,6 @@ HighbrowLog.TrackAuth(
     nickname: userNickname,              // 닉네임 (없으면 string.Empty)
     result: "OK"                         // 인증 결과 (기본 "OK")
 );
-
-// (선택) 인게임 서버에서 판정한 국가 코드가 있다면 즉시 덮어쓰기 가능:
-// HighbrowLog.SetCountry("KR");
 ```
 > **주의:** SUID가 누락되거나 빈 문자열이면 지표가 오염되므로, 반드시 유저를 식별할 수 있는 유효한 문자열을 전달하세요.
 
@@ -114,11 +116,12 @@ public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs args)
     // 기존 결제 처리 로직 유지...
 
     // HighbrowSDK 결제 로그 연동
-    // receiptId에는 args.purchasedProduct.transactionID 또는 args.purchasedProduct.receipt 전달 가능 (SDK 내부 자동 정제)
+    // 중요: receiptId에는 반드시 args.purchasedProduct.transactionID를 전달하세요!
     HighbrowLog.TrackPurchase(
         receiptId: args.purchasedProduct.transactionID,
         price: (float)args.purchasedProduct.metadata.localizedPrice,
         priceId: args.purchasedProduct.definition.id,
+        currency: args.purchasedProduct.metadata.isoCurrencyCode, // 스토어 통화 코드 ("KRW", "USD", "JPY" 등)
         productId: internalNumericId,     // 게임 내부 숫자 상품 ID (없으면 0)
         productName: args.purchasedProduct.metadata.localizedTitle
     );
@@ -126,9 +129,10 @@ public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs args)
     return PurchaseProcessingResult.Complete;
 }
 ```
+> **주의 (미처리 결제 복구 시점):** `TrackPurchase`는 유저 식별(`TrackAuth`)이 완료된 상태에서만 수집됩니다. 미처리 결제 복구(Pending/Unconsumed Purchase) 로직은 반드시 **유저 로그인 완료 이후에 실행**되도록 하거나, 로그인 전 호출 시 `suid` 파라미터를 명시적으로 넘겨주세요.
 
-### [Step 4] 광고 시청 완료 연동 (`TrackAd`)
-광고 리워드 지급 또는 전면 광고 종료 콜백에 호출합니다:
+### [Step 4] 기존 광고 미디에이션 시청 완료 연동 (`TrackAd`)
+AppLovin, IronSource, AdMob 등의 광고 시청 완료 콜백에 호출합니다:
 ```csharp
 using Highbrow.Log;
 
@@ -142,8 +146,26 @@ HighbrowLog.TrackAd(AdType.Interstitial);
 HighbrowLog.TrackAd(AdType.Banner);
 ```
 
+### [Step 5] (선택) Highbrow 자사 크로스 프로모션 광고 팝업 (`HighbrowAd.Show`)
+개발자가 Phase 2에서 자사 광고 연동에 동의한 경우에만 추가합니다:
+```csharp
+using Highbrow.Ad;
+
+// 미디에이션 No-Fill 폴백 또는 크로스 프로모션 버튼 클릭 시
+HighbrowAd.Show(
+    onCompleted: () =>
+    {
+        // 닫기/스킵 완료 시 보상 지급 또는 게임 재개
+    },
+    onFailed: () =>
+    {
+        // 광고 로드 실패 처리
+    }
+);
+```
+
 ## Phase 4. 최종 검증 (Verification)
 1. 컴파일 에러가 없는지 확인합니다.
 2. Unity Editor를 실행했을 때 콘솔에 아래와 같은 1회성 초기화 완료 로그가 뜨는지 확인하도록 안내하세요:
-   `[HighbrowSDK] Initialized v1.3.1 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
+   `[HighbrowSDK] Initialized v1.3.2 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
 ```

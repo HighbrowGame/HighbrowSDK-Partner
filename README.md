@@ -105,6 +105,7 @@ public class GameInitializer : MonoBehaviour
             HttpTimeoutSeconds = 10,                    // HTTP 요청 타임아웃 (3~30초 범위 자동 클램프)
             MaxOfflineQueueSize = 300,                  // 오프라인 캐시 최대 개수
             FlushRetryIntervalSeconds = 30f,            // 오프라인 큐 재전송 주기 (초)
+            CustomCountry = null,                       // 특정 국가 고정 시 2자리 ISO 코드(예: "KR", "US"). null 시 자동 감지
             DebugMode = false,                          // 상용 배포 시 false 지정
             DumpHttpPayload = false                     // DebugMode와 함께 true일 때만 요청/응답 전문 출력
         };
@@ -123,8 +124,13 @@ public class GameInitializer : MonoBehaviour
 | :--- | :--- | :--- |
 | **1. 인증 로그** | `HighbrowLog.TrackAuth(suid, accountId, accountType, nickname, duid);` | 로그인 완료 시점 호출 (ID 4종 자동 캐싱 & 1초 후 2분 주기 Alive 자동 시작) |
 | **2. 세션 하트비트** | `HighbrowLog.StartSessionTracking();` | 2분 주기 자동 발송 (`AutoSessionTracking = true` 시 TrackAuth 직후 자동 실행) |
-| **3. 결제 영수증** | `HighbrowLog.TrackPurchase(receiptId, price, priceId, productId, productName);` | IAP 결제 성공 시점 호출 (캐시된 SUID/DUID 자동 주입) |
+| **3. 결제 영수증** | `HighbrowLog.TrackPurchase(receiptId, price, priceId, currency, productId, productName);` | IAP 결제 성공 시점 호출 (currency는 `args.purchasedProduct.metadata.isoCurrencyCode` 전달) |
 | **4. 광고 시청** | `HighbrowLog.TrackAd(adType);` | 광고 시청 완료 시점 호출 (캐시된 SUID 자동 주입) |
+
+> ⚠️ **결제 로그 연동 주의사항:**
+> - `TrackPurchase`는 유저 로그인(`TrackAuth`)이 완료된 이후에만 수집됩니다. 미처리 결제 복구(Pending Purchase) 처리는 반드시 로그인 완료 후에 수행되도록 구성하세요.
+> - `receiptId`에는 raw JSON 영수증 대신 스토어 트랜잭션 ID(`args.purchasedProduct.transactionID`)를 직접 전달하세요.
+> - `currency`에는 스토어 결제 통화 코드(`args.purchasedProduct.metadata.isoCurrencyCode`)를 전달하세요. (미지정 시 기본값 `"KRW"`)
 
 ---
 
@@ -148,7 +154,7 @@ public class GameInitializer : MonoBehaviour
 # Instruction
 현재 열려 있는 IAP 관리 스크립트에 `HighbrowSDK` 결제 영수증 로그(`TrackPurchase`)를 연동해줘.
 1. 상단에 `using Highbrow.Log;` 추가.
-2. 결제 완료 시점에 `HighbrowLog.TrackPurchase(receiptId, price, priceId, productId, productName);` 호출.
+2. 결제 완료 시점에 `HighbrowLog.TrackPurchase(receiptId: args.purchasedProduct.transactionID, price: (float)args.purchasedProduct.metadata.localizedPrice, priceId: args.purchasedProduct.definition.id, currency: args.purchasedProduct.metadata.isoCurrencyCode, productId: internalId, productName: args.purchasedProduct.metadata.localizedTitle);` 호출.
 ```
 </details>
 
@@ -168,11 +174,13 @@ public class GameInitializer : MonoBehaviour
 ## 🔮 확장 모듈 (`Highbrow.Ad`)
 
 - **`Highbrow.Ad` (`HighbrowAd`)**: 하이브로 자사 게임 크로스 프로모션 광고 송출 기능.
+  - 영상 재생 후 카운트다운이 끝나고 유저가 **닫기(스킵) 버튼을 클릭했을 때** `onCompleted` 콜백이 안전하게 호출됩니다.
+  - UI 상호작용(닫기, 스토어 이동 등)을 위해 씬에 **EventSystem**이 존재해야 합니다.
   ```csharp
   using Highbrow.Ad;
 
   HighbrowAd.Show(
-      onCompleted: () => { /* 보상 지급 또는 게임 재개 */ },
+      onCompleted: () => { /* 닫기/스킵 완료 시 보상 지급 또는 게임 재개 */ },
       onFailed: () => { /* 대체 로직 */ }
   );
   ```

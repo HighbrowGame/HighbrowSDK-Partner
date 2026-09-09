@@ -11,11 +11,20 @@ namespace Highbrow.Core
     /// </summary>
     public static class HighbrowSDK
     {
-        public const string SdkVersion = "1.3.2";
+        public const string SdkVersion = "1.3.5";
 
         private static readonly Dictionary<Type, IHighbrowModule> registeredModules = new Dictionary<Type, IHighbrowModule>();
         private static HighbrowConfig activeConfig;
         private static bool isInitialized;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticState()
+        {
+            registeredModules.Clear();
+            activeConfig = null;
+            isInitialized = false;
+            OnInitialized = null;
+        }
 
         /// <summary>
         /// Gets the current SDK package version.

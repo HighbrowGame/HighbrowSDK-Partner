@@ -92,7 +92,10 @@ namespace Highbrow.Core.Network
                 List<QueuedLogItem> batch = new List<QueuedLogItem>(count);
                 for (int i = 0; i < count; i++)
                 {
-                    batch.Add(cachedData.Items[i]);
+                    if (cachedData.Items[i] != null)
+                    {
+                        batch.Add(cachedData.Items[i]);
+                    }
                 }
                 return batch;
             }
@@ -109,7 +112,7 @@ namespace Highbrow.Core.Network
                 if (removeCount > 0)
                 {
                     cachedData.Items.RemoveRange(0, removeCount);
-                    SaveQueueToPrefs();
+                    SaveQueueToPrefs(true);
                     HighbrowLogger.Log($"Removed {removeCount} processed logs from offline cache. Remaining: {cachedData.Items.Count}");
                 }
             }
@@ -123,8 +126,33 @@ namespace Highbrow.Core.Network
             lock (queueLock)
             {
                 cachedData.Items.Clear();
-                PlayerPrefs.DeleteKey(PrefsQueueKey);
-                PlayerPrefs.Save();
+                try
+                {
+                    if (HighbrowDispatcher.IsMainThread)
+                    {
+                        PlayerPrefs.DeleteKey(PrefsQueueKey);
+                        PlayerPrefs.Save();
+                    }
+                    else
+                    {
+                        HighbrowDispatcher.Instance?.Enqueue(() =>
+                        {
+                            try
+                            {
+                                PlayerPrefs.DeleteKey(PrefsQueueKey);
+                                PlayerPrefs.Save();
+                            }
+                            catch (Exception ex)
+                            {
+                                HighbrowLogger.LogError($"Failed to delete offline queue from PlayerPrefs: {ex.Message}");
+                            }
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    HighbrowLogger.LogError($"Failed to clear offline queue: {ex.Message}");
+                }
             }
         }
 
@@ -132,7 +160,16 @@ namespace Highbrow.Core.Network
         {
             lock (queueLock)
             {
-                string json = PlayerPrefs.GetString(PrefsQueueKey, string.Empty);
+                string json = string.Empty;
+                try
+                {
+                    json = PlayerPrefs.GetString(PrefsQueueKey, string.Empty);
+                }
+                catch (Exception ex)
+                {
+                    HighbrowLogger.LogError($"Failed to read offline queue from PlayerPrefs: {ex.Message}");
+                }
+
                 if (!string.IsNullOrEmpty(json))
                 {
                     try
@@ -149,6 +186,15 @@ namespace Highbrow.Core.Network
                 if (cachedData == null)
                 {
                     cachedData = new QueuedLogWrapper();
+                }
+
+                if (cachedData.Items == null)
+                {
+                    cachedData.Items = new List<QueuedLogItem>();
+                }
+                else
+                {
+                    cachedData.Items.RemoveAll(item => item == null);
                 }
             }
         }
@@ -170,10 +216,31 @@ namespace Highbrow.Core.Network
             try
             {
                 string json = JsonUtility.ToJson(cachedData);
-                PlayerPrefs.SetString(PrefsQueueKey, json);
-                if (flushToDisk)
+                if (HighbrowDispatcher.IsMainThread)
                 {
-                    PlayerPrefs.Save();
+                    PlayerPrefs.SetString(PrefsQueueKey, json);
+                    if (flushToDisk)
+                    {
+                        PlayerPrefs.Save();
+                    }
+                }
+                else
+                {
+                    HighbrowDispatcher.Instance?.Enqueue(() =>
+                    {
+                        try
+                        {
+                            PlayerPrefs.SetString(PrefsQueueKey, json);
+                            if (flushToDisk)
+                            {
+                                PlayerPrefs.Save();
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            HighbrowLogger.LogError($"Failed to persist offline queue on main thread: {ex.Message}");
+                        }
+                    });
                 }
             }
             catch (Exception ex)

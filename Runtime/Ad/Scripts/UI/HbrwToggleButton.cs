@@ -32,7 +32,7 @@ namespace Highbrow.UI
                 buttonImage = GetComponent<Image>();
             }
 
-            UpdateButtonState();
+            UpdateButtonState(false);
 
             if (button != null)
             {
@@ -43,28 +43,30 @@ namespace Highbrow.UI
         public void ToggleState()
         {
             isState1 = !isState1;
-            UpdateButtonState();
+            UpdateButtonState(true);
         }
 
-        public void SetState(bool state1)
+        public void SetState(bool state1, bool triggerCallback = true)
         {
             isState1 = state1;
-            UpdateButtonState();
+            UpdateButtonState(triggerCallback);
         }
 
-        private void UpdateButtonState()
+        private void UpdateButtonState(bool triggerCallback = true)
         {
             if (isState1)
             {
                 if (buttonImage != null && state1Texture != null)
                     buttonImage.sprite = state1Texture;
-                state1Callback?.Invoke();
+                if (triggerCallback)
+                    state1Callback?.Invoke();
             }
             else
             {
                 if (buttonImage != null && state2Texture != null)
                     buttonImage.sprite = state2Texture;
-                state2Callback?.Invoke();
+                if (triggerCallback)
+                    state2Callback?.Invoke();
             }
         }
     }

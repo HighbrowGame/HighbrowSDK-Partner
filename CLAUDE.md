@@ -34,7 +34,7 @@ HighbrowLog.TrackAuth(suid, accountId, AccountType.GooglePlay, nickname);
 
 ### 3. Track IAP Purchase (Receipt)
 ```csharp
-HighbrowLog.TrackPurchase(receiptId, price, priceId, productId, productName);
+HighbrowLog.TrackPurchase(receiptId, originalPrice, priceId, currency, productId, productName);
 ```
 
 ### 4. Track Ad & Show Highbrow House Ads

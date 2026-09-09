@@ -76,10 +76,13 @@ namespace Highbrow.Core.Network
 
         private IEnumerator PostJsonCoroutine(string endpointUrl, string appKey, string logType, string jsonPayload, Action<bool, long, string> onComplete)
         {
-            byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonPayload);
+            bool callbackFired = false;
+            UnityWebRequest request = null;
 
-            using (UnityWebRequest request = new UnityWebRequest(endpointUrl, UnityWebRequest.kHttpVerbPOST))
+            try
             {
+                byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonPayload ?? string.Empty);
+                request = new UnityWebRequest(endpointUrl, UnityWebRequest.kHttpVerbPOST);
                 request.uploadHandler = new UploadHandlerRaw(bodyRaw);
                 request.downloadHandler = new DownloadHandlerBuffer();
                 request.timeout = timeoutSeconds;
@@ -104,33 +107,83 @@ namespace Highbrow.Core.Network
                 {
                     LogRequestDump(endpointUrl, appKey, logType, jsonPayload);
                 }
+            }
+            catch (Exception ex)
+            {
+                HighbrowLogger.LogError($"[HighbrowHttpClient] Request setup error: {ex.Message}");
+                request?.Dispose();
+                onComplete?.Invoke(false, 0, ex.Message);
+                yield break;
+            }
 
-                yield return request.SendWebRequest();
+            long responseCode = 0;
+            try
+            {
+                using (request)
+                {
+                    yield return request.SendWebRequest();
+
+                    try
+                    {
+                        try
+                        {
+                            responseCode = request.responseCode;
+                        }
+                        catch
+                        {
+                            responseCode = 0;
+                        }
 
 #if UNITY_2020_1_OR_NEWER
-                bool isSuccess = request.result == UnityWebRequest.Result.Success;
+                        bool isSuccess = request.result == UnityWebRequest.Result.Success;
 #else
-                bool isSuccess = !request.isNetworkError && !request.isHttpError;
+                        bool isSuccess = !request.isNetworkError && !request.isHttpError;
 #endif
 
-                if (ShouldDumpHttpPayload)
-                {
-                    LogResponseDump(request);
-                }
+                        if (ShouldDumpHttpPayload)
+                        {
+                            LogResponseDump(request);
+                        }
 
-                long responseCode = request.responseCode;
-
-                if (isSuccess)
-                {
-                    string responseText = request.downloadHandler?.text ?? string.Empty;
-                    HighbrowLogger.Log($"[{logType}] Sent successfully. Response Code: {responseCode}");
-                    onComplete?.Invoke(true, responseCode, responseText);
+                        if (isSuccess)
+                        {
+                            string responseText = request.downloadHandler?.text ?? string.Empty;
+                            HighbrowLogger.Log($"[{logType}] Sent successfully. Response Code: {responseCode}");
+                            callbackFired = true;
+                            onComplete?.Invoke(true, responseCode, responseText);
+                        }
+                        else
+                        {
+                            string errorMsg = $"HTTP {responseCode} - {request.error}";
+                            HighbrowLogger.LogWarning($"[{logType}] Request failed: {errorMsg}");
+                            callbackFired = true;
+                            onComplete?.Invoke(false, responseCode, errorMsg);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        HighbrowLogger.LogError($"[HighbrowHttpClient] Response handling error: {ex.Message}");
+                        if (!callbackFired)
+                        {
+                            callbackFired = true;
+                            try
+                            {
+                                onComplete?.Invoke(false, responseCode, ex.Message);
+                            }
+                            catch { }
+                        }
+                    }
                 }
-                else
+            }
+            finally
+            {
+                if (!callbackFired)
                 {
-                    string errorMsg = $"HTTP {responseCode} - {request.error}";
-                    HighbrowLogger.LogWarning($"[{logType}] Request failed: {errorMsg}");
-                    onComplete?.Invoke(false, responseCode, errorMsg);
+                    try
+                    {
+                        onComplete?.Invoke(false, responseCode, "Request terminated unexpectedly");
+                    }
+                    catch { }
                 }
             }
         }

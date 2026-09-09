@@ -124,7 +124,7 @@ public class GameInitializer : MonoBehaviour
 | :--- | :--- | :--- |
 | **1. 인증 로그** | `HighbrowLog.TrackAuth(suid, accountId, accountType, nickname, duid);` | 로그인 완료 시점 호출 (ID 4종 자동 캐싱 & 1초 후 2분 주기 Alive 자동 시작) |
 | **2. 세션 하트비트** | `HighbrowLog.StartSessionTracking();` | 2분 주기 자동 발송 (`AutoSessionTracking = true` 시 TrackAuth 직후 자동 실행) |
-| **3. 결제 영수증** | `HighbrowLog.TrackPurchase(receiptId, price, priceId, currency, productId, productName);` | IAP 결제 성공 시점 호출 (currency는 `args.purchasedProduct.metadata.isoCurrencyCode` 전달) |
+| **3. 결제 영수증** | `HighbrowLog.TrackPurchase(receiptId, originalPrice, priceId, currency, productId, productName);` | IAP 결제 성공 시점 호출 (currency는 `args.purchasedProduct.metadata.isoCurrencyCode` 전달) |
 | **4. 광고 시청** | `HighbrowLog.TrackAd(adType);` | 광고 시청 완료 시점 호출 (캐시된 SUID 자동 주입) |
 
 > ⚠️ **결제 로그 연동 주의사항:**
@@ -154,7 +154,7 @@ public class GameInitializer : MonoBehaviour
 # Instruction
 현재 열려 있는 IAP 관리 스크립트에 `HighbrowSDK` 결제 영수증 로그(`TrackPurchase`)를 연동해줘.
 1. 상단에 `using Highbrow.Log;` 추가.
-2. 결제 완료 시점에 `HighbrowLog.TrackPurchase(receiptId: args.purchasedProduct.transactionID, price: (float)args.purchasedProduct.metadata.localizedPrice, priceId: args.purchasedProduct.definition.id, currency: args.purchasedProduct.metadata.isoCurrencyCode, productId: internalId, productName: args.purchasedProduct.metadata.localizedTitle);` 호출.
+2. 결제 완료 시점에 `HighbrowLog.TrackPurchase(receiptId: args.purchasedProduct.transactionID, originalPrice: (float)args.purchasedProduct.metadata.localizedPrice, priceId: args.purchasedProduct.definition.id, currency: args.purchasedProduct.metadata.isoCurrencyCode, productId: internalId, productName: args.purchasedProduct.metadata.localizedTitle);` 호출.
 ```
 </details>
 

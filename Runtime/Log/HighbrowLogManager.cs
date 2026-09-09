@@ -25,6 +25,13 @@ namespace Highbrow.Log
         public const string PathLogStoreReceipt = PathLogPurchase;
 
         private static HighbrowLogManager instance;
+        private static readonly object instanceLock = new object();
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticState()
+        {
+            instance = null;
+        }
 
         public static HighbrowLogManager Instance
         {
@@ -32,8 +39,14 @@ namespace Highbrow.Log
             {
                 if (instance == null)
                 {
-                    instance = new HighbrowLogManager();
-                    HighbrowSDK.RegisterModule(instance);
+                    lock (instanceLock)
+                    {
+                        if (instance == null)
+                        {
+                            instance = new HighbrowLogManager();
+                            HighbrowSDK.RegisterModule(instance);
+                        }
+                    }
                 }
                 return instance;
             }
@@ -48,16 +61,18 @@ namespace Highbrow.Log
 
         private Coroutine sessionCoroutine;
         private Coroutine flushRetryCoroutine;
+        private bool isFlushingQueue = false;
 
+        private readonly object userLock = new object();
         private string currentSuid;
         private string currentAccountId;
         private AccountType currentAccountType = AccountType.None;
         private string currentDuid;
 
-        public string CurrentSuid => currentSuid;
-        public string CurrentAccountId => currentAccountId;
-        public AccountType CurrentAccountType => currentAccountType;
-        public string CurrentDuid => currentDuid;
+        public string CurrentSuid { get { lock (userLock) return currentSuid; } }
+        public string CurrentAccountId { get { lock (userLock) return currentAccountId; } }
+        public AccountType CurrentAccountType { get { lock (userLock) return currentAccountType; } }
+        public string CurrentDuid { get { lock (userLock) return currentDuid; } }
 
         public HighbrowLogManager()
         {
@@ -113,6 +128,8 @@ namespace Highbrow.Log
             HighbrowDispatcher.OnPauseStateChanged -= HandlePauseStateChanged;
             HighbrowDispatcher.OnQuitTriggered -= HandleApplicationQuit;
 
+            isFlushingQueue = false;
+
             IsInitialized = false;
             HighbrowLogger.Log("HighbrowLogManager shutdown complete.");
         }
@@ -126,13 +143,24 @@ namespace Highbrow.Log
         /// </summary>
         public void SetUserInfo(string suid, string accountId = null, AccountType accountType = AccountType.None, string duid = null)
         {
-            currentSuid = suid;
-            if (!string.IsNullOrEmpty(accountId)) currentAccountId = accountId;
-            if (accountType != AccountType.None) currentAccountType = accountType;
-            if (!string.IsNullOrEmpty(duid)) currentDuid = duid;
-            else if (string.IsNullOrEmpty(currentDuid)) currentDuid = HighbrowContext.GetDuid();
+            string logSuid, logAccountId, logDuid;
+            AccountType logAccountType;
 
-            HighbrowLogger.Log($"User context updated: SUID={MaskIdentifier(suid)}, AccountID={MaskIdentifier(accountId)}, AccountType={accountType}, DUID={MaskIdentifier(currentDuid)}");
+            lock (userLock)
+            {
+                currentSuid = suid;
+                if (!string.IsNullOrEmpty(accountId)) currentAccountId = accountId;
+                if (accountType != AccountType.None) currentAccountType = accountType;
+                if (!string.IsNullOrEmpty(duid)) currentDuid = duid;
+                else if (string.IsNullOrEmpty(currentDuid)) currentDuid = HighbrowContext.GetDuid();
+
+                logSuid = currentSuid;
+                logAccountId = currentAccountId;
+                logAccountType = currentAccountType;
+                logDuid = currentDuid;
+            }
+
+            HighbrowLogger.Log($"User context updated: SUID={MaskIdentifier(logSuid)}, AccountID={MaskIdentifier(logAccountId)}, AccountType={logAccountType}, DUID={MaskIdentifier(logDuid)}");
         }
 
         /// <summary>
@@ -152,9 +180,12 @@ namespace Highbrow.Log
         public void ClearUser()
         {
             StopSessionTracking();
-            currentSuid = null;
-            currentAccountId = null;
-            currentAccountType = AccountType.None;
+            lock (userLock)
+            {
+                currentSuid = null;
+                currentAccountId = null;
+                currentAccountType = AccountType.None;
+            }
             HighbrowLogger.Log("User context cleared.");
         }
 
@@ -228,14 +259,14 @@ namespace Highbrow.Log
         /// Requires user to be authenticated via TrackAuth first.
         /// </summary>
         /// <param name="receiptId">Store receipt transaction ID (Apple transactionId / Google orderId).</param>
-        /// <param name="price">Product price.</param>
+        /// <param name="originalPrice">Product original price in store currency.</param>
         /// <param name="priceId">Store item identifier.</param>
         /// <param name="currency">ISO 4217 Currency code (e.g. "KRW", "USD", "JPY"). Defaults to "KRW".</param>
         /// <param name="productId">Internal game product numeric ID (optional, default: 0).</param>
         /// <param name="productName">Product name string (optional, default: empty).</param>
         /// <param name="purchaseTime">Purchase timestamp (UTC). Defaults to UtcNow.</param>
         /// <param name="suid">Optional SUID override.</param>
-        public void TrackPurchase(string receiptId, float price, string priceId, string currency = "KRW", int productId = 0, string productName = "", DateTime? purchaseTime = null, string suid = null)
+        public void TrackPurchase(string receiptId, float originalPrice, string priceId, string currency = "KRW", int productId = 0, string productName = "", DateTime? purchaseTime = null, string suid = null)
         {
             try
             {
@@ -264,7 +295,7 @@ namespace Highbrow.Log
                     Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
                     Os = HighbrowContext.GetOsType(),
                     Country = HighbrowContext.GetCountry(config?.CustomCountry),
-                    Price = price,
+                    OriginalPrice = originalPrice,
                     Currency = string.IsNullOrWhiteSpace(currency) ? "KRW" : currency.Trim().ToUpperInvariant(),
                     PriceId = priceId ?? string.Empty,
                     ProductId = productId,
@@ -285,9 +316,9 @@ namespace Highbrow.Log
         /// <summary>
         /// Backwards compatible overload for TrackPurchase with productId as 4th parameter.
         /// </summary>
-        public void TrackPurchase(string receiptId, float price, string priceId, int productId, string productName = "", DateTime? purchaseTime = null, string suid = null)
+        public void TrackPurchase(string receiptId, float originalPrice, string priceId, int productId, string productName = "", DateTime? purchaseTime = null, string suid = null)
         {
-            TrackPurchase(receiptId, price, priceId, "KRW", productId, productName, purchaseTime, suid);
+            TrackPurchase(receiptId, originalPrice, priceId, "KRW", productId, productName, purchaseTime, suid);
         }
 
         #endregion
@@ -347,10 +378,17 @@ namespace Highbrow.Log
         /// <param name="intervalSeconds">Interval between subsequent heartbeats in seconds (Default: 120s).</param>
         public void StartSessionTrackingWithDelay(float initialDelaySeconds, float intervalSeconds = 120f)
         {
+            if (!HighbrowDispatcher.IsMainThread)
+            {
+                HighbrowDispatcher.Instance?.Enqueue(() => StartSessionTrackingWithDelay(initialDelaySeconds, intervalSeconds));
+                return;
+            }
+
+            intervalSeconds = Mathf.Max(5f, intervalSeconds);
             StopSessionTracking();
 
             HighbrowLogger.Log($"Starting session tracking coroutine (Delay: {initialDelaySeconds}s, Interval: {intervalSeconds}s)");
-            sessionCoroutine = HighbrowDispatcher.Instance.RunCoroutine(SessionTrackingDelayedRoutine(initialDelaySeconds, intervalSeconds));
+            sessionCoroutine = HighbrowDispatcher.Instance?.RunCoroutine(SessionTrackingDelayedRoutine(initialDelaySeconds, intervalSeconds));
         }
 
         /// <summary>
@@ -367,9 +405,15 @@ namespace Highbrow.Log
         /// </summary>
         public void StopSessionTracking()
         {
+            if (!HighbrowDispatcher.IsMainThread)
+            {
+                HighbrowDispatcher.Instance?.Enqueue(StopSessionTracking);
+                return;
+            }
+
             if (sessionCoroutine != null)
             {
-                HighbrowDispatcher.Instance.TerminateCoroutine(sessionCoroutine);
+                HighbrowDispatcher.Instance?.TerminateCoroutine(sessionCoroutine);
                 sessionCoroutine = null;
                 HighbrowLogger.Log("Session tracking stopped.");
             }
@@ -394,18 +438,29 @@ namespace Highbrow.Log
 
         private void SendUserSessionLog()
         {
-            // Do not emit session alive logs if user has not completed authentication (no active SUID)
-            if (string.IsNullOrEmpty(currentSuid))
+            string suid;
+            string duid;
+            int accountType;
+
+            lock (userLock)
             {
-                return;
+                // Do not emit session alive logs if user has not completed authentication (no active SUID)
+                if (string.IsNullOrEmpty(currentSuid))
+                {
+                    return;
+                }
+                suid = currentSuid;
+                duid = !string.IsNullOrEmpty(currentDuid) ? currentDuid : HighbrowContext.GetDuid();
+                currentDuid = duid;
+                accountType = (int)currentAccountType;
             }
 
             UserSessionLog log = new UserSessionLog
             {
                 Time = HighbrowContext.GetUtcNowIsoString(),
-                AccountType = (int)currentAccountType,
-                Suid = ResolveSuid(null),
-                Duid = ResolveDuid(),
+                AccountType = accountType,
+                Suid = suid,
+                Duid = duid,
                 Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
                 Os = HighbrowContext.GetOsType(),
                 Country = HighbrowContext.GetCountry(config?.CustomCountry)
@@ -489,64 +544,105 @@ namespace Highbrow.Log
                 return;
             }
 
+            // Self-heal if Dispatcher instance was destroyed while previously flushing
+            if (HighbrowDispatcher.Instance == null)
+            {
+                isFlushingQueue = false;
+                onCompleted?.Invoke(0);
+                return;
+            }
+
+            if (isFlushingQueue)
+            {
+                onCompleted?.Invoke(0);
+                return;
+            }
+
+            if (!HighbrowDispatcher.IsMainThread)
+            {
+                HighbrowDispatcher.Instance?.Enqueue(() => FlushOfflineQueue(onCompleted));
+                return;
+            }
+
+            isFlushingQueue = true;
             HighbrowDispatcher.Instance.RunCoroutine(FlushQueueRoutine(onCompleted));
         }
 
         private IEnumerator FlushQueueRoutine(Action<int> onCompleted)
         {
-            var batch = offlineQueue.PeekBatch(20);
-            if (batch == null || batch.Count == 0)
-            {
-                onCompleted?.Invoke(0);
-                yield break;
-            }
-
-            HighbrowLogger.Log($"Flushing offline queue: {batch.Count} logs pending.");
             int successCount = 0;
-
-            for (int i = 0; i < batch.Count; i++)
+            try
             {
-                var item = batch[i];
-                bool isDone = false;
-                bool isSuccess = false;
-
-                string resolvedEndpoint = ResolveEndpointFromQueuedLog(item.LogType);
-                string logTypeHeader = ExtractLogTypeName(item.LogType);
-
-                httpClient.PostJson(resolvedEndpoint, config?.AppKey, logTypeHeader, item.JsonPayload, (success, responseCode, res) =>
+                var batch = offlineQueue.PeekBatch(20);
+                if (batch == null || batch.Count == 0)
                 {
-                    isSuccess = success;
-                    // Permanent 4xx error: Drop item so it does not block the FIFO queue
-                    if (!success && responseCode >= 400 && responseCode < 500)
+                    yield break;
+                }
+
+                HighbrowLogger.Log($"Flushing offline queue: {batch.Count} logs pending.");
+
+                for (int i = 0; i < batch.Count; i++)
+                {
+                    var item = batch[i];
+                    if (item == null || string.IsNullOrEmpty(item.JsonPayload))
                     {
-                        HighbrowLogger.LogError($"[HighbrowLog] Permanent HTTP {responseCode} error during queue flush. Dropping invalid item from offline cache.");
-                        isSuccess = true; // Mark as processed to remove from queue
+                        successCount++;
+                        continue;
                     }
-                    isDone = true;
-                });
 
-                while (!isDone)
-                {
-                    yield return null;
+                    bool isDone = false;
+                    bool isSuccess = false;
+
+                    string resolvedEndpoint = ResolveEndpointFromQueuedLog(item.LogType);
+                    string logTypeHeader = ExtractLogTypeName(item.LogType);
+
+                    httpClient.PostJson(resolvedEndpoint, config?.AppKey, logTypeHeader, item.JsonPayload, (success, responseCode, res) =>
+                    {
+                        isSuccess = success;
+                        // Permanent 4xx error: Drop item so it does not block the FIFO queue
+                        if (!success && responseCode >= 400 && responseCode < 500)
+                        {
+                            HighbrowLogger.LogError($"[HighbrowLog] Permanent HTTP {responseCode} error during queue flush. Dropping invalid item from offline cache.");
+                            isSuccess = true; // Mark as processed to remove from queue
+                        }
+                        isDone = true;
+                    });
+
+                    float waitElapsed = 0f;
+                    float maxWaitTime = (config != null ? config.HttpTimeoutSeconds : 10) + 5f;
+                    while (!isDone && waitElapsed < maxWaitTime)
+                    {
+                        yield return null;
+                        waitElapsed += Time.unscaledDeltaTime;
+                    }
+
+                    if (!isDone)
+                    {
+                        HighbrowLogger.LogWarning($"[HighbrowLog] Queue flush request timed out after {waitElapsed:F1}s. Pausing retry batch.");
+                        break;
+                    }
+
+                    if (isSuccess)
+                    {
+                        successCount++;
+                    }
+                    else
+                    {
+                        HighbrowLogger.LogWarning("Network error during queue flush. Pausing retry batch.");
+                        break;
+                    }
                 }
 
-                if (isSuccess)
+                if (successCount > 0)
                 {
-                    successCount++;
-                }
-                else
-                {
-                    HighbrowLogger.LogWarning("Network error during queue flush. Pausing retry batch.");
-                    break;
+                    offlineQueue.RemoveProcessed(successCount);
                 }
             }
-
-            if (successCount > 0)
+            finally
             {
-                offlineQueue.RemoveProcessed(successCount);
+                isFlushingQueue = false;
+                onCompleted?.Invoke(successCount);
             }
-
-            onCompleted?.Invoke(successCount);
         }
 
         private string ResolveEndpointFromQueuedLog(string logTypeOrPath)
@@ -611,12 +707,10 @@ namespace Highbrow.Log
                 return explicitSuid;
             }
 
-            if (!string.IsNullOrEmpty(currentSuid))
+            lock (userLock)
             {
-                return currentSuid;
+                return !string.IsNullOrEmpty(currentSuid) ? currentSuid : string.Empty;
             }
-
-            return string.Empty;
         }
 
         private static string SanitizeReceiptId(string rawReceiptId)
@@ -670,30 +764,32 @@ namespace Highbrow.Log
 
         private string ResolveDuid()
         {
-            if (!string.IsNullOrEmpty(currentDuid))
+            lock (userLock)
             {
+                if (!string.IsNullOrEmpty(currentDuid))
+                {
+                    return currentDuid;
+                }
+
+                currentDuid = HighbrowContext.GetDuid();
                 return currentDuid;
             }
-
-            currentDuid = HighbrowContext.GetDuid();
-            return currentDuid;
         }
 
         private void HandlePauseStateChanged(bool isPaused)
         {
             if (isPaused)
             {
-                if (!string.IsNullOrEmpty(currentSuid))
-                {
-                    HighbrowLogger.Log("App pausing. Triggering session heartbeat and queue flush.");
-                    SendUserSessionLog();
-                }
-                FlushOfflineQueue();
+                HighbrowLogger.Log("App pausing. Persisting offline queue to disk.");
                 offlineQueue?.PersistToDisk();
             }
             else
             {
-                HighbrowLogger.Log("App resumed. Flushing offline log queue.");
+                HighbrowLogger.Log("App resumed. Triggering session heartbeat and flushing offline log queue.");
+                if (!string.IsNullOrEmpty(currentSuid))
+                {
+                    SendUserSessionLog();
+                }
                 FlushOfflineQueue();
             }
         }

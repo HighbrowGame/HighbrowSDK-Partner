@@ -40,10 +40,28 @@ namespace Highbrow.UI
         private Vector2 _originalPos;
         private Coroutine _moveCoroutine;
 
+        private bool _isInitialized = false;
+
         void Awake()
         {
-            _rectTransform = GetComponent<RectTransform>();
-            _originalPos = _rectTransform.anchoredPosition;
+            EnsureInitialized();
+        }
+
+        private void EnsureInitialized()
+        {
+            if (_isInitialized) return;
+            if (_rectTransform == null) _rectTransform = GetComponent<RectTransform>();
+            if (_rectTransform != null) _originalPos = _rectTransform.anchoredPosition;
+            _isInitialized = true;
+        }
+
+        private void OnDisable()
+        {
+            if (_moveCoroutine != null)
+            {
+                StopCoroutine(_moveCoroutine);
+                _moveCoroutine = null;
+            }
         }
 
         /// <summary>
@@ -51,7 +69,13 @@ namespace Highbrow.UI
         /// </summary>
         public void Move()
         {
-            if (_moveCoroutine != null) StopCoroutine(_moveCoroutine);
+            EnsureInitialized();
+            if (_moveCoroutine != null)
+            {
+                StopCoroutine(_moveCoroutine);
+                _moveCoroutine = null;
+            }
+            if (!gameObject.activeInHierarchy) return;
             _moveCoroutine = StartCoroutine(MoveRoutine(_originalPos + GetDirectionVector() * Distance));
         }
 
@@ -60,22 +84,29 @@ namespace Highbrow.UI
         /// </summary>
         public void ResetPosition(bool immediatly = false)
         {
-            if (_moveCoroutine != null) StopCoroutine(_moveCoroutine);
+            EnsureInitialized();
+            if (_moveCoroutine != null)
+            {
+                StopCoroutine(_moveCoroutine);
+                _moveCoroutine = null;
+            }
             if (immediatly)
             {
-                if (_rectTransform == null)
-                    _rectTransform = GetComponent<RectTransform>();
-                _rectTransform.anchoredPosition = _originalPos;
+                if (_rectTransform != null) _rectTransform.anchoredPosition = _originalPos;
             }
             else
             {
+                if (!gameObject.activeInHierarchy) return;
                 _moveCoroutine = StartCoroutine(MoveRoutine(_originalPos));
             }
         }
 
         private IEnumerator MoveRoutine(Vector2 targetPosition)
         {
-            yield return new WaitForSeconds(Delay);
+            if (Delay > 0f)
+            {
+                yield return new WaitForSecondsRealtime(Delay);
+            }
 
             Vector2 startPosition = _rectTransform.anchoredPosition;
             float elapsedTime = 0f;
@@ -83,7 +114,7 @@ namespace Highbrow.UI
 
             while (elapsedTime < duration)
             {
-                elapsedTime += Time.deltaTime;
+                elapsedTime += Time.unscaledDeltaTime;
                 float t = Mathf.Clamp01(elapsedTime / duration);
                 float easedT = ApplyEase(t);
 

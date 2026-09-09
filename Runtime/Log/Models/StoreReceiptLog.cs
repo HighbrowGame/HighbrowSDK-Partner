@@ -17,7 +17,7 @@ namespace Highbrow.Log
         public int Market;
         public int Os;
         public string Country;
-        public float Price;
+        public float OriginalPrice;
         public string Currency;
         public string PriceId;
         public int ProductId;

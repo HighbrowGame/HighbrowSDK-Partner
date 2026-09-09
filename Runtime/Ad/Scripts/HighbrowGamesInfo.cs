@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Highbrow.Core;
 using UnityEngine;
 using UnityEngine.Video;
@@ -53,7 +52,7 @@ namespace Highbrow.Ad
                 return CustomStoreUrl;
             }
 
-            var market = HighbrowSDK.Config?.Market ?? MarketType.None;
+            var market = (MarketType)HighbrowContext.GetMarketType(HighbrowSDK.Config != null ? HighbrowSDK.Config.Market : MarketType.None, HighbrowSDK.Config?.CustomMarket);
             if (market == MarketType.OneStore)
             {
                 if (!string.IsNullOrEmpty(OnestoreId))
@@ -67,9 +66,14 @@ namespace Highbrow.Ad
             {
                 return !string.IsNullOrEmpty(PlaystoreId) ? $"https://play.google.com/store/apps/details?id={PlaystoreId}" : string.Empty;
             }
-            else
+            else if (Application.platform == RuntimePlatform.IPhonePlayer)
             {
                 return !string.IsNullOrEmpty(AppstoreId) ? $"https://apps.apple.com/app/id{AppstoreId}" : string.Empty;
+            }
+            else
+            {
+                // PC Standalone / Editor / Other platforms do not redirect to mobile app stores
+                return string.Empty;
             }
         }
     }
@@ -106,19 +110,23 @@ namespace Highbrow.Ad
             if (ActiveGameMarketInfos == null || ActiveGameMarketInfos.Count == 0)
                 return null;
 
-            float totalWeight = ActiveGameMarketInfos.Sum(item => item.Portion);
+            float totalWeight = 0f;
+            for (int i = 0; i < ActiveGameMarketInfos.Count; i++)
+            {
+                totalWeight += ActiveGameMarketInfos[i].Portion;
+            }
+
             if (totalWeight <= 0f)
                 return ActiveGameMarketInfos[0];
 
-            System.Random random = new System.Random();
-            float randomValue = (float)(random.NextDouble() * totalWeight);
+            float randomValue = UnityEngine.Random.Range(0f, totalWeight);
 
             float cumulativeWeight = 0f;
-            foreach (var item in ActiveGameMarketInfos)
+            for (int i = 0; i < ActiveGameMarketInfos.Count; i++)
             {
-                cumulativeWeight += item.Portion;
+                cumulativeWeight += ActiveGameMarketInfos[i].Portion;
                 if (randomValue <= cumulativeWeight)
-                    return item;
+                    return ActiveGameMarketInfos[i];
             }
 
             return ActiveGameMarketInfos[0];

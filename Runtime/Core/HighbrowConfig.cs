@@ -145,12 +145,12 @@ namespace Highbrow.Core
         {
             if (!string.IsNullOrEmpty(CustomLogBaseUrl))
             {
-                return CustomLogBaseUrl.TrimEnd('/');
+                return CustomLogBaseUrl.Trim().TrimEnd('/');
             }
 
             if (!string.IsNullOrEmpty(CustomLogEndpointUrl))
             {
-                return CustomLogEndpointUrl.TrimEnd('/');
+                return CustomLogEndpointUrl.Trim().TrimEnd('/');
             }
 
             return UseSandbox ? DefaultSandboxBaseUrl : DefaultProductionBaseUrl;
@@ -220,6 +220,11 @@ namespace Highbrow.Core
 
             // Safe clamp for HTTP timeout (3s ~ 30s)
             HttpTimeoutSeconds = Mathf.Clamp(HttpTimeoutSeconds, 3, 30);
+
+            // Safe bounds for session and queue configurations
+            if (SessionIntervalSeconds <= 0f) SessionIntervalSeconds = 120f;
+            if (MaxOfflineQueueSize <= 0) MaxOfflineQueueSize = 300;
+            if (FlushRetryIntervalSeconds <= 0f) FlushRetryIntervalSeconds = 30f;
 
             errorMessage = null;
             return true;

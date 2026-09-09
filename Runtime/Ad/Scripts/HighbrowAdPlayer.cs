@@ -61,6 +61,9 @@ namespace Highbrow.Ad
         private bool _isFailed = false;
         private bool _hasPlaybackStarted = false;
         private bool _isRewardClaimed = false;
+        private bool _isOwnedCanvas = false;
+        private Coroutine _waitForAdCoroutine = null;
+        private Coroutine _prepareVideoCoroutine = null;
 
         /// <summary>
         /// Indicates whether initialization or required component validation failed.
@@ -92,7 +95,7 @@ namespace Highbrow.Ad
             {
                 HighbrowLogger.LogError("[HighbrowAdPlayer] Critical fields missing. Destroying player instance.");
                 _isFailed = true;
-                Destroy(gameObject);
+                DismissAd();
                 return;
             }
         }
@@ -104,14 +107,65 @@ namespace Highbrow.Ad
 
         void OnDestroy()
         {
+            if (!_isRewardClaimed && !_isFailed)
+            {
+                try
+                {
+                    onAdFailedCallback?.Invoke();
+                }
+                catch { }
+            }
+
+            if (_prepareVideoCoroutine != null)
+            {
+                try
+                {
+                    StopCoroutine(_prepareVideoCoroutine);
+                    _prepareVideoCoroutine = null;
+                }
+                catch { }
+            }
+
+            if (_waitForAdCoroutine != null)
+            {
+                try
+                {
+                    StopCoroutine(_waitForAdCoroutine);
+                    _waitForAdCoroutine = null;
+                }
+                catch { }
+            }
+
             if (AdsVideoPlayer != null)
             {
                 try
                 {
-                    if (AdsVideoPlayer.isPlaying)
-                        AdsVideoPlayer.Stop();
+                    AdsVideoPlayer.loopPointReached -= HandleLoopPointReached;
+
+                    AdsVideoPlayer.Stop();
+
+                    if (AdsVideoPlayer.targetTexture != null)
+                        AdsVideoPlayer.targetTexture.Release();
+
+                    AdsVideoPlayer.clip = null;
+                    AdsVideoPlayer.url = null;
                 }
                 catch { }
+            }
+
+            if (VideoScreen != null)
+            {
+                VideoScreen.texture = null;
+            }
+        }
+
+        private void DismissAd()
+        {
+            Transform parentTransform = transform.parent;
+            Destroy(gameObject);
+            if (_isOwnedCanvas && parentTransform != null && parentTransform.name == "HighbrowAdCanvas")
+            {
+                Destroy(parentTransform.gameObject);
             }
         }
 
@@ -128,7 +182,11 @@ namespace Highbrow.Ad
                 SkipText.text = $"{AdSkipSec:0}s";
             _totalPlayCount++;
 
-            StartCoroutine(PrepareVideo());
+            if (_prepareVideoCoroutine != null)
+            {
+                StopCoroutine(_prepareVideoCoroutine);
+            }
+            _prepareVideoCoroutine = StartCoroutine(PrepareVideo());
         }
 
         /// <summary>
@@ -177,6 +235,15 @@ namespace Highbrow.Ad
         /// <returns>Spawned HighbrowAdPlayer component, or null on failure.</returns>
         public static HighbrowAdPlayer Show(Action onCompleted = null, Action onFailed = null, Canvas parentCanvas = null)
         {
+            if (!HighbrowDispatcher.IsMainThread)
+            {
+                HighbrowDispatcher.Instance?.Enqueue(() =>
+                {
+                    Show(onCompleted, onFailed, parentCanvas);
+                });
+                return null;
+            }
+
             CheckEventSystem();
 
             GameObject prefab = Resources.Load<GameObject>(PREFAB_RESOURCE_PATH);
@@ -187,6 +254,7 @@ namespace Highbrow.Ad
                 return null;
             }
 
+            bool isOwnedCanvas = false;
             Canvas canvas = parentCanvas;
             if (canvas == null)
             {
@@ -208,6 +276,7 @@ namespace Highbrow.Ad
                 ConfigureCanvasScaler(scaler);
 
                 canvasObj.AddComponent<GraphicRaycaster>();
+                isOwnedCanvas = true;
             }
             else if (canvas.name == "HighbrowAdCanvas")
             {
@@ -219,6 +288,7 @@ namespace Highbrow.Ad
                     scaler = canvas.gameObject.AddComponent<CanvasScaler>();
                 }
                 ConfigureCanvasScaler(scaler);
+                isOwnedCanvas = true;
             }
 
             GameObject instance = Instantiate(prefab, canvas.transform);
@@ -228,10 +298,13 @@ namespace Highbrow.Ad
                 HighbrowLogger.LogError("[HighbrowAdPlayer] Instantiated prefab is missing HighbrowAdPlayer component or critical fields.");
                 if (instance != null)
                     Destroy(instance);
+                if (isOwnedCanvas && canvas != null)
+                    Destroy(canvas.gameObject);
                 onFailed?.Invoke();
                 return null;
             }
 
+            player._isOwnedCanvas = isOwnedCanvas;
             player.SetOnAdEnd(onCompleted);
             player.SetOnAdFailed(onFailed);
             player.PlayAd();
@@ -255,11 +328,18 @@ namespace Highbrow.Ad
 
             if (AdsVideoPlayer != null)
             {
-                AdsVideoPlayer.loopPointReached += (player) =>
-                {
-                    StartCoroutine(PrepareVideo());
-                };
+                AdsVideoPlayer.loopPointReached -= HandleLoopPointReached;
+                AdsVideoPlayer.loopPointReached += HandleLoopPointReached;
             }
+        }
+
+        private void HandleLoopPointReached(VideoPlayer source)
+        {
+            if (_prepareVideoCoroutine != null)
+            {
+                StopCoroutine(_prepareVideoCoroutine);
+            }
+            _prepareVideoCoroutine = StartCoroutine(PrepareVideo());
         }
 
         private bool CheckResolutionIfOverStdRatio()
@@ -353,12 +433,29 @@ namespace Highbrow.Ad
                 }
             }
 
-            Destroy(gameObject);
+            DismissAd();
         }
 
         private void HandlePreparationFailed(string reason)
         {
-            HighbrowLogger.LogWarning($"[HighbrowAdPlayer] {reason}. Closing ad.");
+            HighbrowLogger.LogWarning($"[HighbrowAdPlayer] {reason}.");
+
+            // If initial playback already started, a subsequent loop video preparation failure
+            // must NOT trigger onAdFailedCallback or deprive the user of their reward.
+            if (_hasPlaybackStarted)
+            {
+                if (SkipBtn != null)
+                {
+                    SkipBtn.enabled = true;
+                    if (SkipText != null)
+                    {
+                        SkipText.text = "✕";
+                        SkipText.fontStyle = TMPro.FontStyles.Bold;
+                    }
+                }
+                return;
+            }
+
             _isFailed = true;
             try
             {
@@ -368,77 +465,101 @@ namespace Highbrow.Ad
             {
                 HighbrowLogger.LogError($"[HighbrowAdPlayer] Error invoking onAdFailedCallback: {ex.Message}");
             }
-            Destroy(gameObject);
+            DismissAd();
         }
 
         private IEnumerator PrepareVideo()
         {
-            yield return new WaitForEndOfFrame();
-
-            if (HbrwGamesInfo != null)
+            try
             {
-                _currentGameInfo = HbrwGamesInfo.GetRandomByWeight();
-            }
+                yield return new WaitForEndOfFrame();
 
-            if (_currentGameInfo == null)
-            {
-                HandlePreparationFailed("No active GameMarketInfo available");
-                yield break;
-            }
-
-            // 비디오 준비 전 이전 프레임 잔상이 깜빡이지 않도록 화면을 임시 투명화
-            if (VideoScreen != null)
-                VideoScreen.color = Color.clear;
-
-            ApplyGameInfo(_currentGameInfo);
-
-            if (AdsVideoPlayer != null)
-            {
-                if (AdsVideoPlayer.clip == null && string.IsNullOrEmpty(AdsVideoPlayer.url))
+                if (HbrwGamesInfo != null)
                 {
-                    HandlePreparationFailed("No video clip or URL assigned for ad");
+                    _currentGameInfo = HbrwGamesInfo.GetRandomByWeight();
+                }
+
+                if (_currentGameInfo == null)
+                {
+                    HandlePreparationFailed("No active GameMarketInfo available");
                     yield break;
                 }
 
-                bool hasError = false;
-                VideoPlayer.ErrorEventHandler onError = (source, message) =>
-                {
-                    HighbrowLogger.LogWarning($"[HighbrowAdPlayer] VideoPlayer error during preparation: {message}");
-                    hasError = true;
-                };
-                AdsVideoPlayer.errorReceived += onError;
-
-                AdsVideoPlayer.Prepare();
-
-                float elapsed = 0f;
-                const float PREPARE_TIMEOUT = 8.0f;
-                while (!AdsVideoPlayer.isPrepared && !hasError && elapsed < PREPARE_TIMEOUT)
-                {
-                    yield return new WaitForSeconds(0.2f);
-                    elapsed += 0.2f;
-                }
-
-                AdsVideoPlayer.errorReceived -= onError;
-
-                if (!AdsVideoPlayer.isPrepared || hasError)
-                {
-                    HandlePreparationFailed($"Failed to prepare video (error: {hasError}, timeout: {elapsed >= PREPARE_TIMEOUT})");
-                    yield break;
-                }
-
+                // 비디오 준비 전 이전 프레임 잔상이 깜빡이지 않도록 화면을 임시 투명화
                 if (VideoScreen != null)
-                    VideoScreen.color = Color.white;
+                    VideoScreen.color = Color.clear;
 
-                _hasPlaybackStarted = true;
-                HighbrowLog.TrackAd(AdType.CrossPromotion);
-                PlayVideo();
-                StartCoroutine(WaitForAd());
+                ApplyGameInfo(_currentGameInfo);
+
+                if (AdsVideoPlayer != null)
+                {
+                    if (AdsVideoPlayer.targetTexture != null && !AdsVideoPlayer.targetTexture.IsCreated())
+                    {
+                        AdsVideoPlayer.targetTexture.Create();
+                    }
+
+                    if (VideoScreen != null && VideoScreen.texture == null && AdsVideoPlayer.targetTexture != null)
+                    {
+                        VideoScreen.texture = AdsVideoPlayer.targetTexture;
+                    }
+
+                    if (AdsVideoPlayer.clip == null && string.IsNullOrEmpty(AdsVideoPlayer.url))
+                    {
+                        HandlePreparationFailed("No video clip or URL assigned for ad");
+                        yield break;
+                    }
+
+                    bool hasError = false;
+                    VideoPlayer.ErrorEventHandler onError = (source, message) =>
+                    {
+                        HighbrowLogger.LogWarning($"[HighbrowAdPlayer] VideoPlayer error during preparation: {message}");
+                        hasError = true;
+                    };
+                    AdsVideoPlayer.errorReceived += onError;
+
+                    AdsVideoPlayer.Prepare();
+
+                    float elapsed = 0f;
+                    const float PREPARE_TIMEOUT = 8.0f;
+                    while (!AdsVideoPlayer.isPrepared && !hasError && elapsed < PREPARE_TIMEOUT)
+                    {
+                        yield return new WaitForSecondsRealtime(0.2f);
+                        elapsed += 0.2f;
+                    }
+
+                    AdsVideoPlayer.errorReceived -= onError;
+
+                    if (!AdsVideoPlayer.isPrepared || hasError)
+                    {
+                        HandlePreparationFailed($"Failed to prepare video (error: {hasError}, timeout: {elapsed >= PREPARE_TIMEOUT})");
+                        yield break;
+                    }
+
+                    if (VideoScreen != null)
+                        VideoScreen.color = Color.white;
+
+                    if (!_hasPlaybackStarted)
+                    {
+                        _hasPlaybackStarted = true;
+                        HighbrowLog.TrackAd(AdType.CrossPromotion);
+                    }
+                    PlayVideo();
+
+                    if (SkipBtn != null && !SkipBtn.enabled && _waitForAdCoroutine == null)
+                    {
+                        _waitForAdCoroutine = StartCoroutine(WaitForAd());
+                    }
+                }
+
+                if (_currentInfoPanel?.Slider != null)
+                {
+                    _currentInfoPanel.Slider.ResetPosition(true);
+                    _currentInfoPanel.Slider.Move();
+                }
             }
-
-            if (_currentInfoPanel?.Slider != null)
+            finally
             {
-                _currentInfoPanel.Slider.ResetPosition(true);
-                _currentInfoPanel.Slider.Move();
+                _prepareVideoCoroutine = null;
             }
         }
 
@@ -458,22 +579,33 @@ namespace Highbrow.Ad
                 _currentInfoPanel.AppIcon.sprite = gameInfo.AppIcon;
 
             bool isAndroid = Application.platform == RuntimePlatform.Android;
+            bool isIos = Application.platform == RuntimePlatform.IPhonePlayer;
             if (_currentInfoPanel.PlayStoreIcon != null)
                 _currentInfoPanel.PlayStoreIcon.SetActive(isAndroid);
             if (_currentInfoPanel.AppStoreIcon != null)
-                _currentInfoPanel.AppStoreIcon.SetActive(!isAndroid);
+                _currentInfoPanel.AppStoreIcon.SetActive(isIos);
 
             if (_currentInfoPanel.StoreBtn != null)
             {
-                _currentInfoPanel.StoreBtn.onClick.RemoveAllListeners();
-                _currentInfoPanel.StoreBtn.onClick.AddListener(() =>
+                string url = gameInfo.GetStoreLink();
+                bool hasValidUrl = !string.IsNullOrEmpty(url);
+                _currentInfoPanel.StoreBtn.gameObject.SetActive(hasValidUrl);
+
+                if (hasValidUrl)
                 {
-                    string url = gameInfo.GetStoreLink();
-                    if (!string.IsNullOrEmpty(url))
+                    _currentInfoPanel.StoreBtn.onClick.RemoveAllListeners();
+                    _currentInfoPanel.StoreBtn.onClick.AddListener(() =>
                     {
-                        Application.OpenURL(url);
-                    }
-                });
+                        try
+                        {
+                            Application.OpenURL(url);
+                        }
+                        catch (Exception ex)
+                        {
+                            HighbrowLogger.LogError($"[HighbrowAdPlayer] Failed to open store URL: {ex.Message}");
+                        }
+                    });
+                }
             }
 
             if (AdsVideoPlayer != null)
@@ -544,28 +676,35 @@ namespace Highbrow.Ad
 
         private IEnumerator WaitForAd()
         {
-            if (SkipBtn != null)
-                SkipBtn.enabled = false;
-
-            int remainingTime = Mathf.CeilToInt(AdSkipSec);
-
-            while (remainingTime > 0)
+            try
             {
+                if (SkipBtn != null)
+                    SkipBtn.enabled = false;
+
+                int remainingTime = Mathf.CeilToInt(AdSkipSec);
+
+                while (remainingTime > 0)
+                {
+                    if (SkipText != null)
+                        SkipText.text = $"{remainingTime}s";
+
+                    yield return new WaitForSecondsRealtime(1f);
+                    remainingTime--;
+                }
+
                 if (SkipText != null)
-                    SkipText.text = $"{remainingTime}s";
+                {
+                    SkipText.text = "✕";
+                    SkipText.fontStyle = TMPro.FontStyles.Bold;
+                }
 
-                yield return new WaitForSeconds(1f);
-                remainingTime--;
+                if (SkipBtn != null)
+                    SkipBtn.enabled = true;
             }
-
-            if (SkipText != null)
+            finally
             {
-                SkipText.text = "✕";
-                SkipText.fontStyle = TMPro.FontStyles.Bold;
+                _waitForAdCoroutine = null;
             }
-
-            if (SkipBtn != null)
-                SkipBtn.enabled = true;
         }
 
         private bool ValidateAssignedFields()
@@ -641,7 +780,20 @@ namespace Highbrow.Ad
         /// <param name="canvas">Optional canvas override.</param>
         public static HighbrowAdPlayer Show(Action onCompleted = null, Action onFailed = null, Canvas canvas = null)
         {
-            return HighbrowAdPlayer.Show(onCompleted, onFailed, canvas);
+            try
+            {
+                return HighbrowAdPlayer.Show(onCompleted, onFailed, canvas);
+            }
+            catch (Exception ex)
+            {
+                HighbrowLogger.LogError($"[HighbrowAd] Error showing ad: {ex.Message}");
+                try
+                {
+                    onFailed?.Invoke();
+                }
+                catch { }
+                return null;
+            }
         }
     }
 }

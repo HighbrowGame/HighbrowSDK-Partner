@@ -15,6 +15,11 @@ namespace Highbrow.Editor
 
         private static void EnsureSettingsAssetExists()
         {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                return;
+            }
+
             var asset = Resources.Load<HighbrowSettings>(HighbrowSettings.ResourcePath);
             if (asset == null)
             {

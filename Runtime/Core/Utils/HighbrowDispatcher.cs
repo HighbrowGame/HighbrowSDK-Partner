@@ -16,6 +16,16 @@ namespace Highbrow.Core.Utils
         private static bool isQuitting = false;
         private static int mainThreadId;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticState()
+        {
+            instance = null;
+            isQuitting = false;
+            mainThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+            OnPauseStateChanged = null;
+            OnQuitTriggered = null;
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void CaptureMainThreadId()
         {
@@ -57,6 +67,12 @@ namespace Highbrow.Core.Utils
                 {
                     if (instance == null)
                     {
+                        if (!IsMainThread)
+                        {
+                            HighbrowLogger.LogWarning("[HighbrowDispatcher] Cannot instantiate Dispatcher GameObject from a background thread.");
+                            return null;
+                        }
+
                         GameObject go = new GameObject("[HighbrowSDK_Dispatcher]");
                         DontDestroyOnLoad(go);
                         instance = go.AddComponent<HighbrowDispatcher>();
@@ -84,15 +100,33 @@ namespace Highbrow.Core.Utils
             DontDestroyOnLoad(gameObject);
         }
 
+        private void OnDestroy()
+        {
+            if (instance == this)
+            {
+                instance = null;
+            }
+        }
+
         private void Update()
         {
+            Action[] actionsToRun = null;
             lock (executionQueue)
             {
-                while (executionQueue.Count > 0)
+                if (executionQueue.Count > 0)
+                {
+                    actionsToRun = executionQueue.ToArray();
+                    executionQueue.Clear();
+                }
+            }
+
+            if (actionsToRun != null)
+            {
+                for (int i = 0; i < actionsToRun.Length; i++)
                 {
                     try
                     {
-                        executionQueue.Dequeue()?.Invoke();
+                        actionsToRun[i]?.Invoke();
                     }
                     catch (Exception ex)
                     {

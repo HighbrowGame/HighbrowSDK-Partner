@@ -11,6 +11,12 @@ namespace Highbrow.Core.Utils
         public static bool DebugMode = false;
         private const string Tag = "[HighbrowSDK]";
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticState()
+        {
+            DebugMode = false;
+        }
+
         public static void Log(string message)
         {
             if (DebugMode)

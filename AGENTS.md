@@ -103,7 +103,7 @@ HighbrowSDK.Initialize(config);
   ```csharp
   HighbrowLog.TrackPurchase(
       string receiptId,             // Apple transactionID or Google orderId (required)
-      float price,                  // Product price (e.g. (float)args.purchasedProduct.metadata.localizedPrice)
+      float originalPrice,          // Product original price (e.g. (float)args.purchasedProduct.metadata.localizedPrice)
       string priceId,               // Store item SKU (e.g. "com.game.gem_100")
       string currency = "KRW",      // ISO 4217 Currency (e.g. args.purchasedProduct.metadata.isoCurrencyCode)
       int productId = 0,            // Internal numeric product ID (optional, default: 0)

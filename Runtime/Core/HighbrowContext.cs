@@ -12,6 +12,8 @@ namespace Highbrow.Core
     public static class HighbrowContext
     {
         private const string PrefsDuidKey = "HIGHBROW_SDK_SAVED_DUID";
+        private static readonly object duidLock = new object();
+        private static readonly object countryLock = new object();
         private static string cachedDuid;
         private static string cachedCountry;
         private static int? cachedOsType;
@@ -19,6 +21,24 @@ namespace Highbrow.Core
         private static string cachedClientVersion;
         private static int? cachedMarketType;
         private static bool isPreWarmed = false;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticState()
+        {
+            lock (duidLock)
+            {
+                cachedDuid = null;
+            }
+            lock (countryLock)
+            {
+                cachedCountry = null;
+            }
+            isPreWarmed = false;
+            cachedOsType = null;
+            cachedDeviceInfo = null;
+            cachedClientVersion = null;
+            cachedMarketType = null;
+        }
 
         /// <summary>
         /// Pre-warms and caches immutable device, OS, and platform metadata on the Unity main thread.
@@ -36,10 +56,7 @@ namespace Highbrow.Core
                     cachedClientVersion = ResolvePlatformClientVersion(config?.ClientVersion);
                     cachedMarketType = ResolvePlatformMarket(config != null ? config.Market : MarketType.None, config?.CustomMarket);
                     string country = GetCountry(config?.CustomCountry);
-                    if (!string.IsNullOrEmpty(country))
-                    {
-                        cachedCountry = country;
-                    }
+                    cachedCountry = country ?? string.Empty;
                     isPreWarmed = true;
                     HighbrowLogger.Log("[HighbrowContext] Pre-warmed metadata successfully for cross-thread safety.");
                 }
@@ -59,12 +76,28 @@ namespace Highbrow.Core
         }
 
         /// <summary>
-        /// Formats a given DateTime to ISO 8601 UTC string.
+        /// Formats a given DateTime to ISO 8601 UTC string with overflow guards for MinValue/MaxValue.
         /// </summary>
         public static string FormatUtcIsoString(DateTime dateTime)
         {
-            DateTime utc = dateTime.Kind == DateTimeKind.Utc ? dateTime : dateTime.ToUniversalTime();
-            return utc.ToString("yyyy-MM-ddTHH:mm:ss.ffffffZ", CultureInfo.InvariantCulture);
+            try
+            {
+                if (dateTime == DateTime.MinValue || dateTime.Ticks <= TimeSpan.FromHours(14).Ticks)
+                {
+                    return DateTime.MinValue.ToString("yyyy-MM-ddTHH:mm:ss.ffffffZ", CultureInfo.InvariantCulture);
+                }
+                if (dateTime == DateTime.MaxValue || dateTime.Ticks >= DateTime.MaxValue.Ticks - TimeSpan.FromHours(14).Ticks)
+                {
+                    return DateTime.MaxValue.ToString("yyyy-MM-ddTHH:mm:ss.ffffffZ", CultureInfo.InvariantCulture);
+                }
+
+                DateTime utc = dateTime.Kind == DateTimeKind.Utc ? dateTime : dateTime.ToUniversalTime();
+                return utc.ToString("yyyy-MM-ddTHH:mm:ss.ffffffZ", CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.ffffffZ", CultureInfo.InvariantCulture);
+            }
         }
 
         /// <summary>
@@ -83,28 +116,66 @@ namespace Highbrow.Core
                 return cachedDuid;
             }
 
-            try
+            lock (duidLock)
             {
-                string duid = SystemInfo.deviceUniqueIdentifier;
-                if (string.IsNullOrEmpty(duid) || duid == SystemInfo.unsupportedIdentifier)
+                if (!string.IsNullOrEmpty(cachedDuid))
                 {
-                    duid = PlayerPrefs.GetString(PrefsDuidKey, string.Empty);
-                    if (string.IsNullOrEmpty(duid))
-                    {
-                        duid = Guid.NewGuid().ToString("N");
-                        PlayerPrefs.SetString(PrefsDuidKey, duid);
-                        PlayerPrefs.Save();
-                    }
+                    return cachedDuid;
                 }
 
-                cachedDuid = duid;
-                return cachedDuid;
+                try
+                {
+                    string duid = SystemInfo.deviceUniqueIdentifier;
+                    if (string.IsNullOrEmpty(duid) || duid == SystemInfo.unsupportedIdentifier || IsDummyIdentifier(duid))
+                    {
+                        duid = string.Empty;
+                        try
+                        {
+                            duid = PlayerPrefs.GetString(PrefsDuidKey, string.Empty);
+                        }
+                        catch { }
+
+                        if (string.IsNullOrEmpty(duid) || IsDummyIdentifier(duid))
+                        {
+                            duid = Guid.NewGuid().ToString("N");
+                            cachedDuid = duid; // Cache in-memory immediately to guarantee session consistency even if disk write fails
+                            try
+                            {
+                                PlayerPrefs.SetString(PrefsDuidKey, duid);
+                                PlayerPrefs.Save();
+                            }
+                            catch { }
+                        }
+                    }
+
+                    cachedDuid = duid;
+                    return cachedDuid;
+                }
+                catch
+                {
+                    // Fallback for background thread invocation if not pre-warmed
+                    if (string.IsNullOrEmpty(cachedDuid))
+                    {
+                        cachedDuid = Guid.NewGuid().ToString("N");
+                    }
+                    return cachedDuid;
+                }
             }
-            catch
+        }
+
+        private static bool IsDummyIdentifier(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return true;
+            string trimmed = id.Trim();
+            if (trimmed.Equals("unknown", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.Equals("none", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.Equals("null", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.Equals(SystemInfo.unsupportedIdentifier, StringComparison.OrdinalIgnoreCase))
             {
-                // Fallback for background thread invocation if not pre-warmed
-                return Guid.NewGuid().ToString("N");
+                return true;
             }
+            string cleaned = trimmed.Replace("-", string.Empty);
+            return cleaned.Trim('0').Length == 0 || cleaned.Trim('F', 'f').Length == 0;
         }
 
         /// <summary>
@@ -227,17 +298,20 @@ namespace Highbrow.Core
         /// </summary>
         public static void SetCachedCountry(string countryCode)
         {
-            if (!string.IsNullOrEmpty(countryCode))
+            lock (countryLock)
             {
-                string trimmed = countryCode.Trim().ToUpperInvariant();
-                if (trimmed.Length == 2 && char.IsLetter(trimmed[0]) && char.IsLetter(trimmed[1]))
+                if (!string.IsNullOrEmpty(countryCode))
                 {
-                    cachedCountry = trimmed;
-                    return;
+                    string trimmed = countryCode.Trim().ToUpperInvariant();
+                    if (trimmed.Length == 2 && char.IsLetter(trimmed[0]) && char.IsLetter(trimmed[1]))
+                    {
+                        cachedCountry = trimmed;
+                        return;
+                    }
                 }
-            }
 
-            cachedCountry = null;
+                cachedCountry = null;
+            }
         }
 
         /// <summary>
@@ -245,7 +319,10 @@ namespace Highbrow.Core
         /// </summary>
         public static void ClearCachedCountry()
         {
-            cachedCountry = null;
+            lock (countryLock)
+            {
+                cachedCountry = null;
+            }
         }
 
         /// <summary>
@@ -265,19 +342,22 @@ namespace Highbrow.Core
                 }
             }
 
-            if (!string.IsNullOrEmpty(cachedCountry))
+            if (cachedCountry != null)
             {
                 return cachedCountry;
             }
 
-            string resolved = ResolveSystemCountry();
-            if (!string.IsNullOrEmpty(resolved))
+            lock (countryLock)
             {
-                cachedCountry = resolved;
+                if (cachedCountry != null)
+                {
+                    return cachedCountry;
+                }
+
+                string resolved = ResolveSystemCountry();
+                cachedCountry = resolved ?? string.Empty;
                 return cachedCountry;
             }
-
-            return string.Empty;
         }
 
         private static string ResolveSystemCountry()
@@ -289,10 +369,13 @@ namespace Highbrow.Core
                 using (var localeClass = new AndroidJavaClass("java.util.Locale"))
                 using (var defaultLocale = localeClass.CallStatic<AndroidJavaObject>("getDefault"))
                 {
-                    string country = defaultLocale.Call<string>("getCountry");
-                    if (!string.IsNullOrEmpty(country) && country.Length == 2 && char.IsLetter(country[0]) && char.IsLetter(country[1]))
+                    if (defaultLocale != null)
                     {
-                        return country.ToUpperInvariant();
+                        string country = defaultLocale.Call<string>("getCountry");
+                        if (!string.IsNullOrEmpty(country) && country.Length == 2 && char.IsLetter(country[0]) && char.IsLetter(country[1]))
+                        {
+                            return country.ToUpperInvariant();
+                        }
                     }
                 }
             }
@@ -317,40 +400,59 @@ namespace Highbrow.Core
             }
 
             // 3. CultureInfo (CurrentCulture, CurrentUICulture, InstalledUICulture) BCP-47 tags
-            CultureInfo[] candidateCultures = { CultureInfo.CurrentCulture, CultureInfo.CurrentUICulture, CultureInfo.InstalledUICulture };
-            foreach (var culture in candidateCultures)
+            CultureInfo[] candidateCultures = null;
+            try
             {
-                if (culture == null || string.IsNullOrEmpty(culture.Name)) continue;
-                try
+                candidateCultures = new[] { CultureInfo.CurrentCulture, CultureInfo.CurrentUICulture, CultureInfo.InstalledUICulture };
+            }
+            catch
+            {
+                try { candidateCultures = new[] { CultureInfo.CurrentCulture, CultureInfo.CurrentUICulture }; } catch { }
+            }
+
+            if (candidateCultures != null)
+            {
+                foreach (var culture in candidateCultures)
                 {
-                    string[] parts = culture.Name.Split(new[] { '-', '_' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length > 1 && parts[parts.Length - 1].Length == 2)
+                    if (culture == null || string.IsNullOrEmpty(culture.Name)) continue;
+                    try
                     {
-                        string candidate = parts[parts.Length - 1].ToUpperInvariant();
-                        if (char.IsLetter(candidate[0]) && char.IsLetter(candidate[1]))
+                        string[] parts = culture.Name.Split(new[] { '-', '_' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length > 1 && parts[parts.Length - 1].Length == 2)
                         {
-                            return candidate;
+                            string candidate = parts[parts.Length - 1].ToUpperInvariant();
+                            if (char.IsLetter(candidate[0]) && char.IsLetter(candidate[1]))
+                            {
+                                return candidate;
+                            }
                         }
                     }
+                    catch { }
                 }
-                catch { }
             }
 
             // 4. Safe Unity SystemLanguage mapping (only for unambiguous 1:1 language-to-country mappings)
-            switch (Application.systemLanguage)
+            try
             {
-                case SystemLanguage.Korean: return "KR";
-                case SystemLanguage.Japanese: return "JP";
-                case SystemLanguage.ChineseSimplified: return "CN";
-                case SystemLanguage.ChineseTraditional: return "TW";
-                case SystemLanguage.Vietnamese: return "VN";
-                case SystemLanguage.Thai: return "TH";
-                case SystemLanguage.Indonesian: return "ID";
-                case SystemLanguage.Russian: return "RU";
-                case SystemLanguage.Turkish: return "TR";
-                default:
-                    // Multi-country languages (English, Spanish, etc.) defer to server Geo-IP to avoid skewing metrics
-                    return string.Empty;
+                switch (Application.systemLanguage)
+                {
+                    case SystemLanguage.Korean: return "KR";
+                    case SystemLanguage.Japanese: return "JP";
+                    case SystemLanguage.ChineseSimplified: return "CN";
+                    case SystemLanguage.ChineseTraditional: return "TW";
+                    case SystemLanguage.Vietnamese: return "VN";
+                    case SystemLanguage.Thai: return "TH";
+                    case SystemLanguage.Indonesian: return "ID";
+                    case SystemLanguage.Russian: return "RU";
+                    case SystemLanguage.Turkish: return "TR";
+                    default:
+                        // Multi-country languages (English, Spanish, etc.) defer to server Geo-IP to avoid skewing metrics
+                        return string.Empty;
+                }
+            }
+            catch
+            {
+                return string.Empty;
             }
         }
 

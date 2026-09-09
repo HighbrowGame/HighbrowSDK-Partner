@@ -87,11 +87,11 @@ namespace Highbrow.Log
         /// Tracks in-app purchase store receipt.
         /// Backend automatically derives First Purchase (New Paying) metrics.
         /// </summary>
-        public static void TrackPurchase(string receiptId, float price, string priceId, string currency = "KRW", int productId = 0, string productName = "", DateTime? purchaseTime = null, string suid = null)
+        public static void TrackPurchase(string receiptId, float originalPrice, string priceId, string currency = "KRW", int productId = 0, string productName = "", DateTime? purchaseTime = null, string suid = null)
         {
             try
             {
-                Manager.TrackPurchase(receiptId, price, priceId, currency, productId, productName, purchaseTime, suid);
+                Manager.TrackPurchase(receiptId, originalPrice, priceId, currency, productId, productName, purchaseTime, suid);
             }
             catch (Exception ex)
             {
@@ -102,11 +102,11 @@ namespace Highbrow.Log
         /// <summary>
         /// Backwards compatible overload for TrackPurchase with productId as 4th parameter.
         /// </summary>
-        public static void TrackPurchase(string receiptId, float price, string priceId, int productId, string productName = "", DateTime? purchaseTime = null, string suid = null)
+        public static void TrackPurchase(string receiptId, float originalPrice, string priceId, int productId, string productName = "", DateTime? purchaseTime = null, string suid = null)
         {
             try
             {
-                Manager.TrackPurchase(receiptId, price, priceId, "KRW", productId, productName, purchaseTime, suid);
+                Manager.TrackPurchase(receiptId, originalPrice, priceId, "KRW", productId, productName, purchaseTime, suid);
             }
             catch (Exception ex)
             {

@@ -14,10 +14,11 @@
 1. **외과 수술적 수정(Surgical Edits Only):**
    - 파트너사의 기존 게임 로직, 로그인 처리부, 인앱 결제 흐름, 광고 콜백을 리팩토링하거나 구조를 바꾸지 마세요.
    - 오직 성공/완료 시점의 정확한 위치에 `HighbrowLog.Track...()` 호출 한 줄만 안전하게 삽입하세요.
-2. **모듈 네임스페이스:**
+2. **모듈 네임스페이스 & Assembly Definition (.asmdef):**
    - 코어: `using Highbrow.Core;`
    - 로그: `using Highbrow.Log;`
    - 자사 광고(선택): `using Highbrow.Ad;`
+   - **중요:** 연동 대상 스크립트가 커스텀 `.asmdef` 파일 내에 위치한 경우, 해당 asmdef의 `references`에 `Highbrow.Core`, `Highbrow.Log` (광고 연동 시 `Highbrow.Ad`)를 추가해야 컴파일 오류가 발생하지 않습니다.
 3. **4대 핵심 팩트 로그(Fact Logs) 원칙:**
    - 클라이언트는 오직 4개의 사실(Fact) 로그만 전송합니다: `TrackAuth`, `Alive`(자동), `TrackPurchase`, `TrackAd`.
    - **신규 유저(New User), 첫 결제(First Purchase), DAU/DADU 집계 로직을 클라이언트에 직접 작성하지 마세요.** 하이브로/해긴 백엔드가 DB를 통해 100% 자동 산출합니다.
@@ -30,11 +31,13 @@
 # Workflow (4단계 절차)
 
 ## Phase 1. 프로젝트 코드베이스 탐색 (Research)
-코드를 수정하기 전에 프로젝트 구조를 검색하여 아래 4대 연동 지점을 파악하세요:
+코드를 수정하기 전에 프로젝트 구조를 검색하여 아래 주요 연동 지점을 파악하세요:
 1. **초기화 진입점:** 게임 시작 시 최초 1회 실행되는 초기화/부트스트랩 스크립트 (예: `GameInitializer.cs`, `TitleManager.cs`, `SplashManager.cs` 등)
 2. **로그인/인증 성공 지점:** 게스트, 구글, 애플 등 로그인 완료 후 유저 고유 ID(SUID)를 받는 콜백
 3. **인앱 결제(IAP) 성공 지점:** Unity IAP `ProcessPurchase(PurchaseEventArgs args)` 또는 자체 결제 검증 완료 콜백
 4. **광고 시청 완료 지점 (해당 시):** AppLovin MAX, IronSource, AdMob, Unity Ads 등의 보상형/전면 광고 완료 콜백
+5. **로그아웃/계정 전환 지점 (해당 시):** 유저 로그아웃, 타이틀 화면 복귀 등 세션 종료 함수
+6. **Assembly Definition (.asmdef) 존재 여부:** 연동 대상 스크립트가 자체 `.asmdef` 파일에 속해 있는지 확인 (속해 있다면 references 추가 필요)
 
 ## Phase 2. 연동 계획서 제시 및 개발자 의향 확인 (Plan & Approval)
 탐색한 내용을 바탕으로 수정할 파일과 삽입할 코드 스니펫을 개발자에게 보여주고, **반드시 다음 2가지를 먼저 확인받으세요:**
@@ -63,9 +66,9 @@
   #if UNITY_IOS
   targetMarket = MarketType.AppleStore;
   #elif UNITY_ANDROID
-      #if ONESTORE
+      #if ONESTORE || ONE_STORE
       targetMarket = MarketType.OneStore;
-      #elif SAMSUNG || SAMSUNG_STORE
+      #elif SAMSUNG || SAMSUNG_STORE || GALAXY_STORE
       targetMarket = MarketType.SamsungStore;
       #else
       targetMarket = MarketType.GooglePlay;
@@ -76,14 +79,17 @@
 
   HighbrowConfig config = new HighbrowConfig
   {
-      AppKey = "PARTNER_APP_KEY",          // 하이브로 발급 AppKey
+      AppKey = "PARTNER_APP_KEY",          // 하이브로 발급 AppKey (필수)
       Market = targetMarket,               // 타겟 마켓
-      UseSandbox = false,                  // false: 상용, true: 개발/테스트
+      ClientVersion = Application.version, // 클라이언트 버전 (null 시 Application.version 자동 사용)
+      UseSandbox = false,                  // false: 상용 라이브 배포, true: 샌드박스/개발 테스트
+      Region = "kr",                       // 서버 리전 ("kr", "us", "dev", "qa" 등, 기본값 "kr")
       EnableLog = true,
-      AutoSessionTracking = true,         // 2분 주기 세션 하트비트 자동 활성화
+      AutoSessionTracking = true,         // 2분 주기 세션 하트비트(Alive) 자동 활성화
       SessionIntervalSeconds = 120f,
-      HttpTimeoutSeconds = 10,             // 네트워크 타임아웃 (3~30초 자동 보정)
-      CustomCountry = null                 // 특정 국가 고정 시 2자리 ISO 코드 (예: "KR", "US"). null 시 자동 감지
+      HttpTimeoutSeconds = 10,             // 네트워크 타임아웃 (3~30초 자동 클램프)
+      CustomCountry = null,                // 특정 국가 고정 시 2자리 ISO 코드 (예: "KR", "US"). null 시 자동 감지
+      DebugMode = false                    // 상용 배포 시 false (개발/디버깅 시 true)
   };
 
   HighbrowSDK.Initialize(config);
@@ -102,8 +108,12 @@ HighbrowLog.TrackAuth(
     nickname: userNickname,              // 닉네임 (없으면 string.Empty)
     result: "OK"                         // 인증 결과 (기본 "OK")
 );
+
+// (선택) 인게임 서버에서 판정한 유저 국가 코드가 있다면 오버라이드 가능:
+// HighbrowLog.SetCountry("KR");
 ```
 > **주의:** SUID가 누락되거나 빈 문자열이면 지표가 오염되므로, 반드시 유저를 식별할 수 있는 유효한 문자열을 전달하세요.
+> **로그아웃/계정 전환 시:** 타이틀 복귀 또는 로그아웃 시점에 `HighbrowLog.ClearUser();`를 호출하여 세션 하트비트를 정지하고 캐시된 유저 식별자를 정리하세요.
 
 ### [Step 3] 인앱 결제 완료 연동 (`TrackPurchase`)
 결제 성공/영수증 검증 완료 콜백(예: Unity IAP `ProcessPurchase`)에 호출합니다:
@@ -163,6 +173,8 @@ HighbrowAd.Show(
     }
 );
 ```
+> **주의 (EventSystem 필수):** 닫기(스킵), 음소거 토글, 스토어 이동 등 UI 클릭 상호작용을 위해 해당 씬에 **EventSystem**이 활성화되어 있어야 합니다.
+> **보상 지급 시점:** `onCompleted` 콜백은 영상 재생 후 유저가 닫기(스킵) 버튼을 클릭했을 때 안전하게 호출됩니다.
 
 ## Phase 4. 최종 검증 (Verification)
 1. 컴파일 에러가 없는지 확인합니다.

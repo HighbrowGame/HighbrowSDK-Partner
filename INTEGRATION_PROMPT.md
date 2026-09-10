@@ -32,6 +32,7 @@
 
 ## Phase 1. 프로젝트 코드베이스 탐색 (Research)
 코드를 수정하기 전에 프로젝트 구조를 검색하여 아래 주요 연동 지점을 파악하세요:
+0. **SDK 패키지 설치 여부 확인:** `Packages/manifest.json` 파일에 `com.highbrow.sdk`가 등록되어 있는지 확인하세요. 등록되어 있지 않다면 개발자에게 `Packages/manifest.json`의 `dependencies`에 `"com.highbrow.sdk": "https://github.com/HighbrowGame/HighbrowSDK-Partner.git"`를 추가하도록 안내하거나 자동 추가를 제안하세요.
 1. **초기화 진입점:** 게임 시작 시 최초 1회 실행되는 초기화/부트스트랩 스크립트 (예: `GameInitializer.cs`, `TitleManager.cs`, `SplashManager.cs` 등)
 2. **로그인/인증 성공 지점:** 게스트, 구글, 애플 등 로그인 완료 후 유저 고유 ID(SUID)를 받는 콜백
 3. **인앱 결제(IAP) 성공 지점:** Unity IAP `ProcessPurchase(PurchaseEventArgs args)` 또는 자체 결제 검증 완료 콜백
@@ -40,11 +41,12 @@
 6. **Assembly Definition (.asmdef) 존재 여부:** 연동 대상 스크립트가 자체 `.asmdef` 파일에 속해 있는지 확인 (속해 있다면 references 추가 필요)
 
 ## Phase 2. 연동 계획서 제시 및 개발자 의향 확인 (Plan & Approval)
-탐색한 내용을 바탕으로 수정할 파일과 삽입할 코드 스니펫을 개발자에게 보여주고, **반드시 다음 2가지를 먼저 확인받으세요:**
+탐색한 내용을 바탕으로 수정할 파일과 삽입할 코드 스니펫을 개발자에게 보여주고, **반드시 다음 3가지를 먼저 확인받으세요:**
 1. **"이 계획대로 연동을 진행할까요? (Yes / 수정 요청)"**
 2. **"Highbrow 자사 게임 크로스 프로모션 광고(`Highbrow.Ad`) 모듈도 함께 연동할까요? (Yes / No)"**
    - 개발자가 No를 선택하면: 로그 수집(Core, Log)만 깔끔하게 연동합니다.
    - 개발자가 Yes를 선택하면: [Step 5]의 `HighbrowAd.Show` 연동을 추가합니다.
+3. **"하이브로에서 발급받은 AppKey가 있으신가요? (있다면 알려주세요 / 아직 없다면 임시 키 설정 후 `Highbrow > SDK Settings`에서 언제든 변경 가능)"**
 
 ## Phase 3. 순차적 코드 삽입 (Implementation)
 
@@ -112,11 +114,12 @@ HighbrowLog.TrackAuth(
 // (선택) 인게임 서버에서 판정한 유저 국가 코드가 있다면 오버라이드 가능:
 // HighbrowLog.SetCountry("KR");
 ```
-> **주의:** SUID가 누락되거나 빈 문자열이면 지표가 오염되므로, 반드시 유저를 식별할 수 있는 유효한 문자열을 전달하세요.
+> **주의 (SUID 필수):** SUID가 누락되거나 빈 문자열이면 지표가 오염되므로, 반드시 유저를 식별할 수 있는 고유한 문자열을 전달하세요.
+> **AccountType 매핑:** `AccountType.GooglePlay`, `AccountType.AppleId`, `AccountType.Guest`, `AccountType.Facebook`, `AccountType.Steam` 등 유저의 실제 로그인 방식에 맞추어 전달하세요.
 > **로그아웃/계정 전환 시:** 타이틀 복귀 또는 로그아웃 시점에 `HighbrowLog.ClearUser();`를 호출하여 세션 하트비트를 정지하고 캐시된 유저 식별자를 정리하세요.
 
 ### [Step 3] 인앱 결제 완료 연동 (`TrackPurchase`)
-결제 성공/영수증 검증 완료 콜백(예: Unity IAP `ProcessPurchase`)에 호출합니다:
+결제 성공/영수증 검증 완료 콜백(예: Unity IAP `ProcessPurchase` 또는 자체 영수증 검증 콜백)에 호출합니다:
 ```csharp
 using Highbrow.Log;
 
@@ -139,6 +142,8 @@ public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs args)
     return PurchaseProcessingResult.Complete;
 }
 ```
+> **주의 (스토어 트랜잭션 ID 전달):** `receiptId`에는 반드시 구글 주문번호(`GPA.xxxx-xxxx-xxxx-xxxxx`) 또는 애플 트랜잭션 ID(`args.purchasedProduct.transactionID`)를 전달해야 합니다. Unity IAP의 `args.purchasedProduct.receipt` (raw JSON 전문)을 그대로 넘기면 SDK에서 형식 오류로 거부됩니다.
+> **자체 결제 검증 서버 사용 시:** 서버 영수증 검증 통신 완료 후 응답받은 스토어 트랜잭션 ID, 결제 금액, 상품 SKU, 통화 코드를 `TrackPurchase`로 전달하세요.
 > **주의 (미처리 결제 복구 시점):** `TrackPurchase`는 유저 식별(`TrackAuth`)이 완료된 상태에서만 수집됩니다. 미처리 결제 복구(Pending/Unconsumed Purchase) 로직은 반드시 **유저 로그인 완료 이후에 실행**되도록 하거나, 로그인 전 호출 시 `suid` 파라미터를 명시적으로 넘겨주세요.
 
 ### [Step 4] 기존 광고 미디에이션 시청 완료 연동 (`TrackAd`)
@@ -180,4 +185,5 @@ HighbrowAd.Show(
 1. 컴파일 에러가 없는지 확인합니다.
 2. Unity Editor를 실행했을 때 콘솔에 아래와 같은 1회성 초기화 완료 로그가 뜨는지 확인하도록 안내하세요:
    `[HighbrowSDK] Initialized v1.3.5 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
+3. Unity Editor 상단 메뉴 `Highbrow > Show Current SDK Status`를 실행하여 초기화 상태와 Server Mode(SANDBOX / PROD)가 정상적으로 표시되는지 확인합니다.
 ```

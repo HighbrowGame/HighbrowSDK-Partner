@@ -7,11 +7,12 @@
 
 ## 📑 목차
 1. [🌟 5분 AI 초고속 연동 (한 줄 킥오프)](#-5분-ai-초고속-연동-한-줄-킥오프)
-2. [특징 및 아키텍처 원칙](#-특징-및-아키텍처-원칙)
-3. [설치 가이드 (Unity Package Manager)](#-설치-가이드-unity-package-manager)
-4. [SDK 수동 초기화 및 4대 핵심 로그 API](#-sdk-수동-초기화-및-4대-핵심-로그-api)
-5. [개별 AI 프롬프트 템플릿 (선택 사항)](#-개별-ai-프롬프트-템플릿-선택-사항)
-6. [확장 모듈 (`Highbrow.Ad`)](#-확장-모듈-highbrowad)
+2. [📘 사람 개발자용 상세 연동 매뉴얼 (INTEGRATION_GUIDE.md)](INTEGRATION_GUIDE.md)
+3. [특징 및 아키텍처 원칙](#-특징-및-아키텍처-원칙)
+4. [설치 가이드 (Unity Package Manager)](#-설치-가이드-unity-package-manager)
+5. [SDK 수동 초기화 및 4대 핵심 로그 API](#-sdk-수동-초기화-및-4대-핵심-로그-api)
+6. [개별 AI 프롬프트 템플릿 (선택 사항)](#-개별-ai-프롬프트-템플릿-선택-사항)
+7. [확장 모듈 (`Highbrow.Ad`)](#-확장-모듈-highbrowad)
 
 ---
 
@@ -26,6 +27,9 @@
 > ```
 
 AI가 프로젝트 내의 초기화, 로그인(`TrackAuth`), 인앱 결제(`TrackPurchase`), 광고(`TrackAd`) 위치를 스스로 탐색하고, 맞춤형 연동 계획을 제시한 후 안전하게 코드를 자동 삽입합니다.
+
+> 📖 **사람 개발자를 위한 상세 연동 매뉴얼:**<br>
+> AI 도구 없이 직접 단계별로 수동 연동하거나, QA 체크리스트 및 상세 파라미터 설정을 확인하려면 [📘 INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md)를 확인하세요.
 
 ---
 
@@ -188,5 +192,4 @@ public class GameInitializer : MonoBehaviour
 ---
 
 ## 📞 기술 지원 및 문의
-- **엔지니어링 팀:** dev@highbrow-inc.com
-- **공식 웹사이트:** https://highbrow-inc.com
+- **기술 지원 및 AppKey 발급 문의:** kms@highbrow.com

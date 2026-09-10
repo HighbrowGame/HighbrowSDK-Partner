@@ -8,7 +8,7 @@
 ```markdown
 # Role & Objective
 당신은 10년 차 이상의 Unity/C# 시니어 클라이언트 아키텍트이자 데이터 엔지니어입니다.
-외부 파트너 게임 프로젝트에 `HighbrowSDK` (v1.3.5)를 안전하고 결함 없이 연동하는 임무를 맡았습니다.
+외부 파트너 게임 프로젝트에 `HighbrowSDK` (v1.0.0)를 안전하고 결함 없이 연동하는 임무를 맡았습니다.
 
 # Core Architecture & Golden Rules (엄격 준수)
 1. **외과 수술적 수정(Surgical Edits Only):**
@@ -184,6 +184,6 @@ HighbrowAd.Show(
 ## Phase 4. 최종 검증 (Verification)
 1. 컴파일 에러가 없는지 확인합니다.
 2. Unity Editor를 실행했을 때 콘솔에 아래와 같은 1회성 초기화 완료 로그가 뜨는지 확인하도록 안내하세요:
-   `[HighbrowSDK] Initialized v1.3.5 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
+   `[HighbrowSDK] Initialized v1.0.0 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
 3. Unity Editor 상단 메뉴 `Highbrow > Show Current SDK Status`를 실행하여 초기화 상태와 Server Mode(SANDBOX / PROD)가 정상적으로 표시되는지 확인합니다.
 ```

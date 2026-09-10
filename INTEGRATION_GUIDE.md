@@ -1,5 +1,5 @@
 # Highbrow SDK (Unity Client) 개발사 연동 매뉴얼
-> **문서 버전:** v1.3.5 (최신 패키지 기준)
+> **문서 버전:** v1.0.0 (최신 패키지 기준)
 > **대상 독자:** 파트너사 클라이언트 개발자, 테크니컬 디렉터(TD), QA 엔지니어
 > **지원 환경:** Unity 2020.3 LTS 이상 (Unity 2021, 2022, 2023, Unity 6 완벽 지원)
 > **지원 플랫폼:** Android (Google Play, ONE store, Galaxy Store), iOS (App Store), PC (Steam)
@@ -206,7 +206,7 @@ public class TitleSceneManager : MonoBehaviour
 ```
 
 > **성공 확인:** 게임 실행 시 Unity 콘솔창에 아래와 같은 로그가 1회 출력되면 정상 초기화된 것입니다:
-> `[HighbrowSDK] Initialized v1.3.5 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
+> `[HighbrowSDK] Initialized v1.0.0 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
 
 ---
 
@@ -380,7 +380,7 @@ public class AdRewardManager : MonoBehaviour
 ### 1. Unity 콘솔 로그 확인
 Unity Editor에서 Play Mode를 시작했을 때 콘솔창에 다음 로그가 출력되는지 확인합니다:
 ```text
-[HighbrowSDK] Initialized v1.3.5 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)
+[HighbrowSDK] Initialized v1.0.0 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)
 ```
 
 ### 2. 에디터 진단 도구 활용
@@ -422,7 +422,7 @@ Unity Editor에서 Play Mode를 시작했을 때 콘솔창에 다음 로그가 �
 게임 백엔드 데이터베이스에서 해당 유저를 식별하는 **고유 유저 시퀀스/UUID(문자열)**를 넘겨주셔야 합니다. 기기 ID(DUID)나 닉네임을 넘기지 마세요.
 
 ### Q5. 백그라운드 스레드(Task/async)에서 호출해도 안전한가요?
-**안전합니다.** HighbrowSDK v1.3.4+는 `PreWarm` 캐싱과 메인 스레드 자동 디스패처(`HighbrowDispatcher`)를 내장하고 있어, 백그라운드 워커 스레드에서 `TrackAuth`, `TrackPurchase` 등을 호출하더라도 Unity Main Thread 예외 없이 안전하게 동작합니다.
+**안전합니다.** HighbrowSDK는 `PreWarm` 캐싱과 메인 스레드 자동 디스패처(`HighbrowDispatcher`)를 내장하고 있어, 백그라운드 워커 스레드에서 `TrackAuth`, `TrackPurchase` 등을 호출하더라도 Unity Main Thread 예외 없이 안전하게 동작합니다.
 
 ### Q6. 크로스 프로모션 광고(`HighbrowAd.Show`)의 닫기/스킵 버튼이 클릭되지 않습니다.
 해당 씬의 Hierarchy에 **EventSystem** GameObject가 활성화되어 있는지 확인하세요. Unity uGUI의 모든 버튼 클릭 이벤트는 EventSystem을 필요로 합니다.

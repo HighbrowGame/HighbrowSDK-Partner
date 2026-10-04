@@ -392,7 +392,14 @@ Unity Editor에서 Play Mode를 시작했을 때 콘솔창에 다음 로그가 �
 ### 3. HTTP 패킷 검증 (디버그 모드)
 `HighbrowSettings.asset`에서 **`DebugMode = true`** 및 **`DumpHttpPayload = true`**로 설정하면, SDK가 서버로 전송하는 HTTP 요청 JSON 바디와 응답 코드가 콘솔에 실시간으로 상세 출력되어 전송 데이터를 육안으로 검증할 수 있습니다.
 
-### 4. QA 체크리스트
+### 4. 오프라인 큐 강제 실패 테스트
+전송 실패 시 로그가 유실되지 않고 재전송되는지 에디터에서 바로 확인할 수 있습니다:
+1. 네트워크를 끊거나, 코드 기반 설정(방법 B)이라면 `CustomLogBaseUrl`을 존재하지 않는 주소(예: `https://invalid-log-domain.example`)로 지정합니다.
+2. 로그(결제/광고 등)를 발생시키고 콘솔에서 `Request failed` → `Enqueued log to offline cache. Current queue count: N` 출력을 확인합니다.
+3. 네트워크(또는 URL)를 복구하면 30초 주기 재시도 또는 앱 복귀 시 큐가 전송되고 `Removed N processed logs from offline cache. Remaining: 0`이 출력되는지 확인합니다.
+4. 테스트 후 **`Highbrow > Clear Offline Log Cache (PlayerPrefs)`**로 남은 캐시를 정리하고, `CustomLogBaseUrl` 지정을 반드시 제거합니다.
+
+### 5. QA 체크리스트
 
 | 검증 항목 | 테스트 절차 | 기대 결과 | 확인 여부 |
 | :--- | :--- | :--- | :---: |

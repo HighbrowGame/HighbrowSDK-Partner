@@ -8,6 +8,7 @@ namespace Highbrow.Log
     {
         All = -1,
         None = 0,
+        Guest = 0, // Same as None: the collector treats None as a guest account.
         AppleGameCenter = 1,
         GooglePlay = 2,
         Facebook = 3,
@@ -15,7 +16,6 @@ namespace Highbrow.Log
         AppleId = 5,
         GameCenterTeam = 6,
         Vng = 7,
-        HighbrowId = 8,
-        Guest = 9
+        HighbrowId = 8
     }
 }

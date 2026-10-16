@@ -199,7 +199,7 @@ namespace Highbrow.Log
         /// (Haegin requirement: Automatically triggers session alive heartbeat shortly after Auth).
         /// </summary>
         /// <param name="suid">User unique ID.</param>
-        /// <param name="accountId">Platform account ID (e.g. Google sub, Apple user identifier).</param>
+        /// <param name="accountId">Platform account ID (e.g. Google sub, Apple user identifier). Replaced with SUID for Guest.</param>
         /// <param name="accountType">Account type enum.</param>
         /// <param name="nickname">User nickname.</param>
         /// <param name="duid">Optional custom device unique ID (null defaults to device unique ID).</param>
@@ -217,6 +217,15 @@ namespace Highbrow.Log
                     return;
                 }
 
+                // Guest has no platform ID, so SUID is used as the unique AccountId.
+                if (accountType == AccountType.Guest) accountId = suid;
+
+                lock (userLock)
+                {
+                    // Auth replaces the account context, including Guest(0) and empty AccountId.
+                    currentAccountId = accountId;
+                    currentAccountType = accountType;
+                }
                 SetUserInfo(suid, accountId, accountType, duid);
 
                 AuthLog log = new AuthLog

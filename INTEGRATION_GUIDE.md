@@ -1,5 +1,5 @@
 # Highbrow SDK (Unity Client) 개발사 연동 매뉴얼
-> **문서 버전:** v1.0.0 (최신 패키지 기준)
+> **문서 버전:** v1.0.1 (최신 패키지 기준)
 > **대상 독자:** 파트너사 클라이언트 개발자, 테크니컬 디렉터(TD), QA 엔지니어
 > **지원 환경:** Unity 2020.3 LTS 이상 (Unity 2021, 2022, 2023, Unity 6 완벽 지원)
 > **지원 플랫폼:** Android (Google Play, ONE store, Galaxy Store), iOS (App Store), PC (Steam)
@@ -206,7 +206,7 @@ public class TitleSceneManager : MonoBehaviour
 ```
 
 > **성공 확인:** 게임 실행 시 Unity 콘솔창에 아래와 같은 로그가 1회 출력되면 정상 초기화된 것입니다:
-> `[HighbrowSDK] Initialized v1.0.0 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
+> `[HighbrowSDK] Initialized v1.0.1 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
 
 ---
 
@@ -239,7 +239,7 @@ public void OnLoginSuccess(string userUid, string socialSubId, string userNickna
 | **구글 플레이 게임즈** | `AccountType.GooglePlay` (2) | Android Google 로그인 |
 | **애플 ID (Sign in with Apple)** | `AccountType.AppleId` (5) | iOS Apple ID 로그인 |
 | **애플 게임센터** | `AccountType.AppleGameCenter` (1) | GameCenter 인증 |
-| **게스트 (Guest)** | `AccountType.Guest` (9) | 계정 연동 없는 기기 로컬 게스트 |
+| **게스트 (Guest)** | `AccountType.Guest` (0, `None`과 동일) | 계정 연동 없는 게스트. `accountId`는 SDK가 SUID로 자동 대체 |
 | **페이스북** | `AccountType.Facebook` (3) | Facebook 소셜 로그인 |
 | **스팀** | `AccountType.Steam` (4) | PC Steam 계정 로그인 |
 
@@ -380,7 +380,7 @@ public class AdRewardManager : MonoBehaviour
 ### 1. Unity 콘솔 로그 확인
 Unity Editor에서 Play Mode를 시작했을 때 콘솔창에 다음 로그가 출력되는지 확인합니다:
 ```text
-[HighbrowSDK] Initialized v1.0.0 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)
+[HighbrowSDK] Initialized v1.0.1 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)
 ```
 
 ### 2. 에디터 진단 도구 활용

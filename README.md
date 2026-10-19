@@ -23,8 +23,10 @@
 
 > 📋 **AI 킥오프 프롬프트 (복사하여 AI에 입력):**
 > ```text
-> INTEGRATION_PROMPT.md를 읽고 우리 프로젝트에 HighbrowSDK를 연동해줘
+> Library/PackageCache/com.highbrow.sdk@*/INTEGRATION_PROMPT.md를 읽고 우리 프로젝트에 HighbrowSDK를 연동해줘
 > ```
+>
+> ⚠️ SDK를 Git URL로 설치하면 파일은 `Packages/`가 아니라 `Library/PackageCache/com.highbrow.sdk@<해시>/`에 있습니다(해시는 버전마다 다름). `Library/`는 AI가 검색에서 건너뛰는 경우가 많으니 위처럼 경로를 함께 입력하세요. 이 폴더는 읽기 전용 캐시이므로 파일을 수정하지 마세요.
 
 AI가 프로젝트 내의 초기화, 로그인(`TrackAuth`), 인앱 결제(`TrackPurchase`), 광고(`TrackAd`) 위치를 스스로 탐색하고, 맞춤형 연동 계획을 제시한 후 안전하게 코드를 자동 삽입합니다.
 

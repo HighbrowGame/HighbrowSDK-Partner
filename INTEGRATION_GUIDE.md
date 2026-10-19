@@ -217,12 +217,12 @@ public class TitleSceneManager : MonoBehaviour
 using Highbrow.Log;
 
 // 로그인 성공 콜백
-public void OnLoginSuccess(string userUid, string socialSubId, string userNickname)
+public void OnLoginSuccess(string userUid, string userNickname)
 {
     // Highbrow 인증 로그 전송 (SUID 및 디바이스 ID 자동 캐싱 & 1초 후 2분 주기 Alive 자동 시작)
     HighbrowLog.TrackAuth(
-        suid: userUid,                       // 게임 유저 고유 ID (문자열) - [필수!]
-        accountId: socialSubId,               // 구글 sub ID, 애플 user ID 등
+        suid: userUid,                        // 게임 유저 고유 ID (문자열) - [필수!] 유저 기준 키
+        accountId: null,                      // 게임에서 계정별로 따로 정의한 ID(예: 서버별 계정 ID). 없으면 null/빈 값 -> SDK가 SUID로 대체. 구글 sub ID, 애플 user ID는 넣지 않음
         accountType: AccountType.GooglePlay,  // AccountType 열거형 지정
         nickname: userNickname,               // 유저 닉네임 (없으면 string.Empty)
         result: "OK"                          // 인증 결과 (기본값 "OK")
@@ -239,12 +239,19 @@ public void OnLoginSuccess(string userUid, string socialSubId, string userNickna
 | **구글 플레이 게임즈** | `AccountType.GooglePlay` (2) | Android Google 로그인 |
 | **애플 ID (Sign in with Apple)** | `AccountType.AppleId` (5) | iOS Apple ID 로그인 |
 | **애플 게임센터** | `AccountType.AppleGameCenter` (1) | GameCenter 인증 |
-| **게스트 (Guest)** | `AccountType.Guest` (0, `None`과 동일) | 계정 연동 없는 게스트. `accountId`는 SDK가 SUID로 자동 대체 |
+| **게스트 (Guest)** | `AccountType.Guest` (0, `None`과 동일) | 계정 연동 없는 게스트. 소셜 로그인과 동일하게 SUID 전달 (`accountId`는 정의가 없으면 SUID로 대체) |
 | **페이스북** | `AccountType.Facebook` (3) | Facebook 소셜 로그인 |
 | **스팀** | `AccountType.Steam` (4) | PC Steam 계정 로그인 |
 
+#### `TrackAuth` 필드 값 규칙 (잘못된 값 예시 포함)
+| 필드 | 올바른 값 | 잘못된 값 (사용 금지) |
+| :--- | :--- | :--- |
+| `suid` | 게임 유저 고유 ID. 로그인 수단이 바뀌어도(게스트→구글 연동 등) 같은 유저면 같은 값 | 빈 값, 기기 정보, 로그인할 때마다 바뀌는 값 |
+| `accountId` | 게임이 계정별(서버별 등)로 정의한 ID. 정의가 없으면 `null` 또는 빈 값 (SDK가 SUID로 대체) | 생성 시각·타임스탬프, 구글 sub ID, 애플 user ID, 임의 문자열 |
+| `accountType` | 위 표의 `AccountType` 열거형 값 | 표에 없는 숫자 캐스팅(예: `(AccountType)9`), 게스트에 임의 값 |
+
 > ⚠️ **주의사항:**
-> 1. `suid`는 유저를 식별하는 핵심 키입니다. null이거나 빈 문자열(`""`)이면 통계 지표가 왜곡되므로 반드시 고유 ID를 전달해야 합니다.
+> 1. `suid`는 유저를 식별하는 핵심 키입니다. null이거나 빈 문자열(`""`)이면 통계 지표가 왜곡되므로 반드시 고유 ID를 전달해야 합니다. `accountId`는 한 유저가 서버별 등 여러 계정을 가질 때 계정별로 게임이 정의한 ID이며, 따로 정의하지 않았다면 비워 두세요(SDK가 SUID로 대체). 구글 sub ID, 애플 user ID 같은 소셜 원본 ID는 사용하지 않습니다.
 > 2. `TrackAuth`가 성공적으로 호출되면 1초 뒤부터 **2분 주기 세션 유지 하트비트(`Alive`) 로그가 백그라운드에서 자동 전송**됩니다.
 > 3. **로그아웃/계정 전환 시:** 유저가 로그아웃하거나 타이틀 화면으로 돌아갈 때는 `HighbrowLog.ClearUser();`를 호출하여 세션 타이머를 중지하고 캐시를 초기화하세요.
 
@@ -404,7 +411,7 @@ Unity Editor에서 Play Mode를 시작했을 때 콘솔창에 다음 로그가 �
 | 검증 항목 | 테스트 절차 | 기대 결과 | 확인 여부 |
 | :--- | :--- | :--- | :---: |
 | **SDK 초기화** | 앱 시작 씬 진입 | `[HighbrowSDK] Initialized...` 로그 1회 출력 | [ ] |
-| **로그인 연동** | 구글/애플/게스트 로그인 완료 | `POST /v1/log/auth` 전송 확인 (SUID 유효값 확인) | [ ] |
+| **로그인 연동** | 구글/애플/게스트 로그인 완료 | `POST /v1/log/auth` 전송 확인. `DumpHttpPayload`로 본문의 `Suid`가 유저 고유 ID, `AccountId`가 정의된 계정 ID(없으면 `Suid`와 동일), `AccountType`이 열거형 값(게스트 0)인지 확인 | [ ] |
 | **세션 하트비트** | 로그인 후 2분 이상 게임 플레이 | 2분 주기마다 `POST /v1/log/alive` 주기적 전송 확인 | [ ] |
 | **인앱 결제** | 테스트 결제 완료 | `POST /v1/log/purchase` 전송 (transactionID, price, currency) | [ ] |
 | **광고 시청** | 동영상/전면 광고 완료 | `POST /v1/log/ad` 전송 (adType 확인) | [ ] |

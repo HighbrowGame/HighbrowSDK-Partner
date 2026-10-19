@@ -198,8 +198,8 @@ namespace Highbrow.Log
         /// Caches SUID, AccountID, AccountType, and DUID for subsequent purchase, ad, and alive logs.
         /// (Haegin requirement: Automatically triggers session alive heartbeat shortly after Auth).
         /// </summary>
-        /// <param name="suid">User unique ID.</param>
-        /// <param name="accountId">Platform account ID (e.g. Google sub, Apple user identifier). Replaced with SUID for Guest.</param>
+        /// <param name="suid">User unique ID (required, the user key).</param>
+        /// <param name="accountId">Per-account ID defined by the game (e.g. per-server account). Defaults to SUID when null or empty.</param>
         /// <param name="accountType">Account type enum.</param>
         /// <param name="nickname">User nickname.</param>
         /// <param name="duid">Optional custom device unique ID (null defaults to device unique ID).</param>
@@ -217,8 +217,8 @@ namespace Highbrow.Log
                     return;
                 }
 
-                // Guest has no platform ID, so SUID is used as the unique AccountId.
-                if (accountType == AccountType.Guest) accountId = suid;
+                // No separate account is defined by the game, so SUID is used as the AccountId.
+                if (string.IsNullOrWhiteSpace(accountId)) accountId = suid;
 
                 lock (userLock)
                 {

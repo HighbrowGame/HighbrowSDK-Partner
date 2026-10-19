@@ -70,8 +70,8 @@ HighbrowSDK.Initialize(config);
 - **Signature:**
   ```csharp
   HighbrowLog.TrackAuth(
-      string suid,                  // Game user unique ID (as string)
-      string accountId,             // Social platform ID (e.g. Google sub, Apple user ID)
+      string suid,                  // Game user unique ID (required, the user key)
+      string accountId,             // Per-account ID defined by the game (null/empty -> SUID). Do NOT pass Google sub / Apple user ID
       AccountType accountType,      // AccountType.GooglePlay, AccountType.AppleId, AccountType.Guest, etc.
       string nickname,              // User display name (or string.Empty)
       string duid = null,           // Optional custom DUID (defaults to SystemInfo.deviceUniqueIdentifier)

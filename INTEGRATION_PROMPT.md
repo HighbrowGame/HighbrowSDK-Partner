@@ -1,7 +1,9 @@
 # HighbrowSDK AI Master Integration Prompt
 > **외부 개발사 안내:**<br>
 > Cursor Composer, GitHub Copilot Chat, Claude Code, Windsurf 등의 AI 어시스턴트에게 다음 한 줄을 입력하세요:<br>
-> **`"INTEGRATION_PROMPT.md를 읽고 우리 프로젝트에 HighbrowSDK를 연동해줘"`**
+> **`"Library/PackageCache/com.highbrow.sdk@*/INTEGRATION_PROMPT.md를 읽고 우리 프로젝트에 HighbrowSDK를 연동해줘"`**<br>
+> (이미 연동한 프로젝트의 업데이트: **`"Library/PackageCache/com.highbrow.sdk@*/INTEGRATION_PROMPT.md를 읽고 HighbrowSDK를 최신 버전으로 업데이트해줘"`**)<br>
+> Git URL 패키지는 `Packages/`가 아니라 `Library/PackageCache/`에 설치되며(해시는 버전마다 다름), AI가 `Library/`를 건너뛰는 경우가 있어 경로를 함께 입력합니다. 이 폴더는 읽기 전용이므로 수정하지 마세요.
 
 ---
 
@@ -25,6 +27,24 @@
 4. **ID 자동 캐싱:**
    - `TrackAuth` 호출 시 입력된 `SUID`, `AccountId`, `AccountType`, `DUID`는 SDK 내부에 자동 캐싱됩니다.
    - 이후 결제(`TrackPurchase`), 광고(`TrackAd`), 세션(`Alive`)에서 SUID를 다시 지정하지 않아도 자동으로 캐시된 값이 주입됩니다.
+
+---
+
+# Mode 판별 (먼저 확인)
+- **업데이트 모드:** 개발자가 "업데이트"를 요청했고, 프로젝트에 이미 `HighbrowLog.TrackAuth` 호출이 있으면 아래 [업데이트 모드]만 수행하고 Workflow(Phase 1~4)는 건너뜁니다.
+- **최초 연동 모드:** 그 외에는 아래 Workflow(Phase 1~4)를 수행합니다. [업데이트 모드]는 실행하지 마세요.
+
+## [업데이트 모드] 최신 버전으로 업데이트
+개발사마다 설치된 버전이 다르므로, 버전별 변경은 이 문서가 아니라 패키지의 `CHANGELOG.md`를 기준으로 적용합니다. 기존 연동 코드의 구조는 바꾸지 말고 `CHANGELOG.md`가 지시한 항목만 수정하세요.
+1. **설치된 버전 확인 (업데이트 전에 반드시):** `Library/PackageCache/com.highbrow.sdk@*/package.json`의 `version`을 읽어 기록하세요. (찾을 수 없으면 `Packages/manifest.json`의 `com.highbrow.sdk` 값에서 `#태그`를 확인하고, 그것도 없으면 개발자에게 현재 버전을 물어보세요.) 패키지를 갱신하면 이전 버전을 알 수 없으니 먼저 기록해야 합니다.
+2. **패키지 갱신:** `Packages/manifest.json`의 `com.highbrow.sdk` 값을 `https://github.com/HighbrowGame/HighbrowSDK-Partner.git#<최신 태그>`로 바꾸고, `Packages/packages-lock.json`의 `com.highbrow.sdk` 항목을 삭제하도록 안내하거나 수정하세요. 최신 태그는 개발자가 알려준 버전을 우선하고, 없으면 개발자에게 확인하세요. (lock 항목을 삭제하지 않으면 이전 커밋이 남을 수 있습니다.) Unity가 패키지를 다시 받은 뒤 다음 단계로 진행하세요.
+3. **마이그레이션 적용:** 갱신된 패키지의 `CHANGELOG.md`에서 **설치된 버전보다 높고 최신 버전 이하인 모든 항목**을 오래된 버전부터 순서대로 적용하세요. 각 항목의 `찾는 방법`으로 코드를 검색하고 `수정 방법`대로만 고치며, `사람 판단 필요` 항목은 임의로 정하지 말고 개발자에게 물어보세요. 버전을 건너뛰지 마세요.
+4. **확인:** 컴파일 에러가 없는지 확인하고, 콘솔에 `Initialized v<최신 버전>`이 출력되는지, 샌드박스에서 `DumpHttpPayload`로 Auth 본문(`AccountType`, `AccountId`, `Suid`)이 정상인지 점검하도록 안내하세요.
+5. **결과 보고:** 첫 줄에 `설치 버전 → 최신 버전 (N단계)`를 적고, 아래 표로 보고하세요.
+
+   | 버전 | 항목 | 수정한 위치(파일:줄) | 결과 |
+   | :--- | :--- | :--- | :--- |
+   | 1.0.1 | TrackAuth accountId | `Login.cs:42` | 적용 / 해당 없음 / 사람 판단 필요 |
 
 ---
 
@@ -104,8 +124,8 @@ using Highbrow.Log;
 
 // 로그인 성공 시점
 HighbrowLog.TrackAuth(
-    suid: userUniqueId,                  // 게임 유저 고유 ID (문자열) - 필수!
-    accountId: socialAccountId,          // 구글 sub ID, 애플 user ID 등
+    suid: userUniqueId,                  // 게임 유저 고유 ID (문자열) - 필수! 유저 기준 키
+    accountId: null,                     // 게임이 계정별로 정의한 ID(예: 서버별 계정). 없으면 null -> SDK가 SUID로 대체. 구글 sub ID, 애플 user ID는 넣지 않음
     accountType: AccountType.GooglePlay, // GooglePlay, AppleId, Guest, Facebook 등
     nickname: userNickname,              // 닉네임 (없으면 string.Empty)
     result: "OK"                         // 인증 결과 (기본 "OK")
@@ -114,8 +134,8 @@ HighbrowLog.TrackAuth(
 // (선택) 인게임 서버에서 판정한 유저 국가 코드가 있다면 오버라이드 가능:
 // HighbrowLog.SetCountry("KR");
 ```
-> **주의 (SUID 필수):** SUID가 누락되거나 빈 문자열이면 지표가 오염되므로, 반드시 유저를 식별할 수 있는 고유한 문자열을 전달하세요.
-> **AccountType 매핑:** `AccountType.GooglePlay`, `AccountType.AppleId`, `AccountType.Guest`, `AccountType.Facebook`, `AccountType.Steam` 등 유저의 실제 로그인 방식에 맞추어 전달하세요. 게스트는 `AccountType.Guest`(0)이며, 이때 `accountId`는 SDK가 SUID로 자동 대체하므로 별도 값(생성 시각 등)을 만들어 넣지 마세요.
+> **주의 (SUID 필수):** SUID가 유저 기준 키입니다. 누락되거나 빈 문자열이면 지표가 오염되므로 반드시 유저를 식별할 수 있는 고유한 문자열을 전달하세요. AccountId는 게임이 계정별(서버별 등)로 따로 정의한 경우에만 넣고, 없으면 비워 두세요(SDK가 SUID로 대체). 구글 sub ID, 애플 user ID 같은 소셜 원본 ID는 쓰지 마세요.
+> **AccountType 매핑:** `AccountType.GooglePlay`, `AccountType.AppleId`, `AccountType.Guest`, `AccountType.Facebook`, `AccountType.Steam` 등 유저의 실제 로그인 방식에 맞추어 전달하세요. 게스트는 `AccountType.Guest`(0)이며, 게스트도 동일하게 SUID를 전달하고 `accountId`는 비워 두세요(생성 시각 등 임의 값 금지).
 > **로그아웃/계정 전환 시:** 타이틀 복귀 또는 로그아웃 시점에 `HighbrowLog.ClearUser();`를 호출하여 세션 하트비트를 정지하고 캐시된 유저 식별자를 정리하세요.
 
 ### [Step 3] 인앱 결제 완료 연동 (`TrackPurchase`)
@@ -185,5 +205,6 @@ HighbrowAd.Show(
 1. 컴파일 에러가 없는지 확인합니다.
 2. Unity Editor를 실행했을 때 콘솔에 아래와 같은 1회성 초기화 완료 로그가 뜨는지 확인하도록 안내하세요:
    `[HighbrowSDK] Initialized v1.0.1 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
-3. Unity Editor 상단 메뉴 `Highbrow > Show Current SDK Status`를 실행하여 초기화 상태와 Server Mode(SANDBOX / PROD)가 정상적으로 표시되는지 확인합니다.
+3. `TrackAuth` 호출 인자를 점검하세요: `suid`는 유저 고유 ID(빈 값 금지), `accountId`는 게임이 정의한 계정 ID가 있을 때만 전달하고 없으면 `null`(생성 시각·구글 sub ID·애플 user ID 금지), `accountType`은 `AccountType` 열거형 값만 사용(숫자 캐스팅 금지). 로그인 수단이 바뀌어도 같은 유저의 `suid`는 유지되어야 합니다.
+4. Unity Editor 상단 메뉴 `Highbrow > Show Current SDK Status`를 실행하여 초기화 상태와 Server Mode(SANDBOX / PROD)가 정상적으로 표시되는지 확인합니다.
 ```

@@ -2,7 +2,9 @@
 > **외부 개발사 안내:**<br>
 > Cursor Composer, GitHub Copilot Chat, Claude Code, Windsurf 등의 AI 어시스턴트에게 다음 한 줄을 입력하세요:<br>
 > **`"Library/PackageCache/com.highbrow.sdk@*/INTEGRATION_PROMPT.md를 읽고 우리 프로젝트에 HighbrowSDK를 연동해줘"`**<br>
-> (이미 연동한 프로젝트의 업데이트: **`"Library/PackageCache/com.highbrow.sdk@*/INTEGRATION_PROMPT.md를 읽고 HighbrowSDK를 최신 버전으로 업데이트해줘"`**)<br>
+> **이미 연동한 프로젝트의 업데이트 (권장, 설치된 버전과 무관):**<br>
+> **`"https://raw.githubusercontent.com/HighbrowGame/HighbrowSDK-Partner/main/INTEGRATION_PROMPT.md 를 읽고 HighbrowSDK를 최신 버전으로 업데이트해줘"`**<br>
+> (설치된 패키지에 업데이트 모드가 없는 구버전(v1.0.0 등)에서도 동작합니다. v1.0.1 이상이 설치돼 있으면 `"Library/PackageCache/com.highbrow.sdk@*/INTEGRATION_PROMPT.md를 읽고 HighbrowSDK를 최신 버전으로 업데이트해줘"`도 가능합니다.)<br>
 > Git URL 패키지는 `Packages/`가 아니라 `Library/PackageCache/`에 설치되며(해시는 버전마다 다름), AI가 `Library/`를 건너뛰는 경우가 있어 경로를 함께 입력합니다. 이 폴더는 읽기 전용이므로 수정하지 마세요.
 
 ---
@@ -37,7 +39,7 @@
 ## [업데이트 모드] 최신 버전으로 업데이트
 개발사마다 설치된 버전이 다르므로, 버전별 변경은 이 문서가 아니라 패키지의 `CHANGELOG.md`를 기준으로 적용합니다. 기존 연동 코드의 구조는 바꾸지 말고 `CHANGELOG.md`가 지시한 항목만 수정하세요.
 1. **설치된 버전 확인 (업데이트 전에 반드시):** `Library/PackageCache/com.highbrow.sdk@*/package.json`의 `version`을 읽어 기록하세요. (찾을 수 없으면 `Packages/manifest.json`의 `com.highbrow.sdk` 값에서 `#태그`를 확인하고, 그것도 없으면 개발자에게 현재 버전을 물어보세요.) 패키지를 갱신하면 이전 버전을 알 수 없으니 먼저 기록해야 합니다.
-2. **패키지 갱신:** `Packages/manifest.json`의 `com.highbrow.sdk` 값을 `https://github.com/HighbrowGame/HighbrowSDK-Partner.git#<최신 태그>`로 바꾸고, `Packages/packages-lock.json`의 `com.highbrow.sdk` 항목을 삭제하도록 안내하거나 수정하세요. 최신 태그는 개발자가 알려준 버전을 우선하고, 없으면 개발자에게 확인하세요. (lock 항목을 삭제하지 않으면 이전 커밋이 남을 수 있습니다.) Unity가 패키지를 다시 받은 뒤 다음 단계로 진행하세요.
+2. **패키지 갱신:** `Packages/manifest.json`의 `com.highbrow.sdk` 값을 `https://github.com/HighbrowGame/HighbrowSDK-Partner.git#<최신 태그>`로 바꾸고, `Packages/packages-lock.json`의 `com.highbrow.sdk` 항목을 삭제하도록 안내하거나 수정하세요. 최신 태그는 개발자가 알려준 버전을 우선하고, 없으면 `git ls-remote --tags --sort=-v:refname https://github.com/HighbrowGame/HighbrowSDK-Partner.git`(또는 저장소의 Tags 페이지)로 조회한 가장 높은 버전 태그를 사용하세요. 어떤 태그를 쓰는지 개발자에게 알려주되, 되묻지는 마세요. (lock 항목을 삭제하지 않으면 이전 커밋이 남을 수 있습니다.) Unity가 패키지를 다시 받은 뒤 다음 단계로 진행하세요.
 3. **마이그레이션 적용:** 갱신된 패키지의 `CHANGELOG.md`에서 **설치된 버전보다 높고 최신 버전 이하인 모든 항목**을 오래된 버전부터 순서대로 적용하세요. 각 항목의 `찾는 방법`으로 코드를 검색하고 `수정 방법`대로만 고치며, `사람 판단 필요` 항목은 임의로 정하지 말고 개발자에게 물어보세요. 버전을 건너뛰지 마세요.
 4. **확인:** 컴파일 에러가 없는지 확인하고, 콘솔에 `Initialized v<최신 버전>`이 출력되는지, 샌드박스에서 `DumpHttpPayload`로 Auth 본문(`AccountType`, `AccountId`, `Suid`)이 정상인지 점검하도록 안내하세요.
 5. **결과 보고:** 첫 줄에 `설치 버전 → 최신 버전 (N단계)`를 적고, 아래 표로 보고하세요.

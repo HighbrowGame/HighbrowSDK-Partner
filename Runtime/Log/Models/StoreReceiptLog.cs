@@ -26,4 +26,16 @@ namespace Highbrow.Log
         public string ClientVersion;
         public string DeviceInfo;
     }
+
+    /// <summary>
+    /// Sandbox-only variant of <see cref="StoreReceiptLog"/> that also carries the receipt string exactly as the game passed it.
+    /// Used so the receipt shape of each store can be inspected from the collector. Never sent to production
+    /// (JsonUtility cannot omit a field, so production uses the base class, which has no RawData key).
+    /// </summary>
+    [Preserve]
+    [Serializable]
+    public class StoreReceiptSandboxLog : StoreReceiptLog
+    {
+        public string RawData;
+    }
 }

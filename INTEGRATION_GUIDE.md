@@ -1,5 +1,5 @@
 # Highbrow SDK (Unity Client) 개발사 연동 매뉴얼
-> **문서 버전:** v1.0.1 (최신 패키지 기준)
+> **문서 버전:** v1.0.2 (최신 패키지 기준)
 > **대상 독자:** 파트너사 클라이언트 개발자, 테크니컬 디렉터(TD), QA 엔지니어
 > **지원 환경:** Unity 2020.3 LTS 이상 (Unity 2021, 2022, 2023, Unity 6 완벽 지원)
 > **지원 플랫폼:** Android (Google Play, ONE store, Galaxy Store), iOS (App Store), PC (Steam)
@@ -206,7 +206,7 @@ public class TitleSceneManager : MonoBehaviour
 ```
 
 > **성공 확인:** 게임 실행 시 Unity 콘솔창에 아래와 같은 로그가 1회 출력되면 정상 초기화된 것입니다:
-> `[HighbrowSDK] Initialized v1.0.1 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
+> `[HighbrowSDK] Initialized v1.0.2 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
 
 ---
 
@@ -271,7 +271,7 @@ public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs args)
 
     // 2. Highbrow 결제 로그 전송
     HighbrowLog.TrackPurchase(
-        receiptId: args.purchasedProduct.transactionID,            // 중요: 스토어 트랜잭션 ID 전달
+        receiptId: args.purchasedProduct.receipt,                  // 중요: 영수증 전문을 가공 없이 그대로 전달 (SDK가 주문번호 추출)
         originalPrice: (float)args.purchasedProduct.metadata.localizedPrice, // 결제 금액
         priceId: args.purchasedProduct.definition.id,             // 스토어 등록 인앱 SKU
         currency: args.purchasedProduct.metadata.isoCurrencyCode, // 스토어 결제 통화 ("KRW", "USD" 등)
@@ -292,7 +292,7 @@ public void OnServerPurchaseVerified(string storeTransactionId, float price, str
 {
     // Highbrow 결제 로그 전송
     HighbrowLog.TrackPurchase(
-        receiptId: storeTransactionId, // 구글 주문번호(GPA.xxxx) 또는 애플 transactionID
+        receiptId: storeTransactionId, // 구글 orderId(GPA.xxxx, 구매 토큰 아님) 또는 애플 transactionID
         originalPrice: price,
         priceId: storeSku,
         currency: currencyCode,        // ISO 4217 통화 코드 ("KRW", "USD" 등)
@@ -302,7 +302,7 @@ public void OnServerPurchaseVerified(string storeTransactionId, float price, str
 ```
 
 > ⚠️ **결제 연동 핵심 주의사항:**
-> 1. **`receiptId`에 raw JSON 전달 금지:** `args.purchasedProduct.receipt` (수 KB 크기의 base64 암호화 전문)을 그대로 넣으면 SDK에서 유효성 검사 오류로 차단됩니다. 반드시 **`args.purchasedProduct.transactionID`** (예: Google Order ID `GPA.xxxx-xxxx-xxxx-xxxxx` 또는 Apple 트랜잭션 번호)를 전달하세요.
+> 1. **`receiptId`에는 `args.purchasedProduct.receipt`를 가공 없이 그대로 전달:** SDK가 스토어별로 주문번호(Google `orderId` `GPA.xxxx-xxxx-xxxx-xxxxx`, Apple `TransactionID`)를 추출해 전송합니다(상용 모드에서는 영수증 전문을 전송하지 않으며, 샌드박스에서만 점검용으로 원문도 함께 전송됩니다). **`args.purchasedProduct.transactionID`는 사용하지 마세요.** Google Play에서는 주문번호가 아니라 구매 토큰이 올 수 있고, 128자를 넘는 값은 SDK가 오류로 거부합니다. (자체 검증 서버 사용 시 Case B처럼 Google `orderId`/Apple 트랜잭션 ID를 직접 전달)
 > 2. **미처리 결제 복구(Pending/Restore) 시점:** `TrackPurchase`는 유저 식별(`TrackAuth`)이 완료된 이후에만 정상 수집됩니다. 앱 기동 시 발생하는 미처리 결제 복구 처리는 반드시 **유저 로그인 완료 이후에 수행**되도록 순서를 맞추어 주세요.
 
 ---
@@ -387,7 +387,7 @@ public class AdRewardManager : MonoBehaviour
 ### 1. Unity 콘솔 로그 확인
 Unity Editor에서 Play Mode를 시작했을 때 콘솔창에 다음 로그가 출력되는지 확인합니다:
 ```text
-[HighbrowSDK] Initialized v1.0.1 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)
+[HighbrowSDK] Initialized v1.0.2 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)
 ```
 
 ### 2. 에디터 진단 도구 활용
@@ -429,8 +429,8 @@ Unity Editor에서 Play Mode를 시작했을 때 콘솔창에 다음 로그가 �
 모바일 클라이언트 단에서는 앱 재설치, 기기 변경, 스토어 계정 전환 등의 상황에서 해당 유저가 '진짜 신규 유저'인지 '첫 결제 유저'인지 100% 무결하게 판별하기 어렵습니다.
 따라서 Highbrow 시스템은 **클라이언트는 오직 일어난 사실(인증, 결제)만 전송**하고, **중앙 수집 서버가 전체 유저 DB를 조회하여 신규 및 첫 결제 여부를 서버에서 자동 판정**하도록 설계되었습니다. 개발사는 이에 대한 부가 코드를 작성할 필요가 없습니다.
 
-### Q3. `receiptId`에 영수증 전문(raw JSON)을 넣으면 왜 안 되나요?
-영수증 전문(raw JSON)은 데이터 크기가 크고 플랫폼별 스키마가 상이하여 분석 효율을 저하시킵니다. 데이터 파이프라인(Snowflake)에서는 고유 거래 번호인 스토어 트랜잭션 ID(`GPA.xxxx` 또는 `transactionID`)를 기본 식별자로 관리하므로, 원시 JSON 대신 트랜잭션 ID를 전달해야 합니다.
+### Q3. `receiptId`에 영수증 전문을 넣어도 되나요? 서버로 영수증 전문이 전송되나요?
+`product.receipt`를 그대로 넣는 것이 권장 방식입니다. SDK가 영수증에서 스토어 주문번호(Google `orderId`, Apple `TransactionID`)만 추출해 전송합니다. 영수증 전문은 상용 모드에서는 전송하지 않고, 샌드박스(`UseSandbox = true`)에서만 연동 점검용으로 `RawData`로 함께 전송합니다. 스토어마다 영수증 구조와 `transactionID` 값의 의미가 달라서(Google Play는 구매 토큰이 올 수 있음), 개발사가 직접 값을 고르지 않도록 SDK가 처리합니다.
 
 ### Q4. `SUID`는 어떤 값을 넘겨야 하나요?
 게임 백엔드 데이터베이스에서 해당 유저를 식별하는 **고유 유저 시퀀스/UUID(문자열)**를 넘겨주셔야 합니다. 기기 ID(DUID)나 닉네임을 넘기지 마세요.

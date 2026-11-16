@@ -267,7 +267,7 @@ namespace Highbrow.Log
         /// Backend automatically derives First Purchase (New Paying) metrics by querying user purchase history in DB.
         /// Requires user to be authenticated via TrackAuth first.
         /// </summary>
-        /// <param name="receiptId">Store receipt transaction ID (Apple transactionId / Google orderId).</param>
+        /// <param name="receiptId">Unity IAP raw receipt (product.receipt, recommended: the SDK extracts the store order ID) or an already-extracted order ID (Apple transactionId / Google orderId).</param>
         /// <param name="originalPrice">Product original price in store currency.</param>
         /// <param name="priceId">Store item identifier.</param>
         /// <param name="currency">ISO 4217 Currency code (e.g. "KRW", "USD", "JPY"). Defaults to "KRW".</param>
@@ -288,33 +288,57 @@ namespace Highbrow.Log
                     return;
                 }
 
-                string sanitizedReceipt = SanitizeReceiptId(receiptId);
+                int marketType = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket);
+                string sanitizedReceipt = SanitizeReceiptId(receiptId, marketType);
+                bool isSandbox = config != null && config.UseSandbox;
                 if (string.IsNullOrEmpty(sanitizedReceipt))
                 {
-                    return;
+                    // Production: reject. Sandbox: still send the log (ReceiptId = marker, RawData = receipt as passed)
+                    // so the unrecognized receipt shape can be inspected from the collector.
+                    if (!isSandbox || string.IsNullOrWhiteSpace(receiptId))
+                    {
+                        return;
+                    }
+
+                    sanitizedReceipt = UnresolvedReceiptId;
+                    HighbrowLogger.LogWarning($"[HighbrowLog] Sandbox: order ID not resolved. Sending ReceiptId='{UnresolvedReceiptId}' with RawData for inspection.");
                 }
 
                 DateTime pTime = purchaseTime ?? DateTime.UtcNow;
 
-                StoreReceiptLog log = new StoreReceiptLog
+                // Sandbox only: also send the receipt exactly as passed (RawData) to inspect store receipt shapes.
+                // Skipped if too large (a cut receipt is useless). Production payload never contains RawData.
+                bool includeRawData = isSandbox && !string.IsNullOrEmpty(receiptId);
+                if (includeRawData && receiptId.Length > MaxRawDataLength)
                 {
-                    Time = HighbrowContext.GetUtcNowIsoString(),
-                    Suid = targetSuid,
-                    ReceiptId = sanitizedReceipt,
-                    Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
-                    Os = HighbrowContext.GetOsType(),
-                    Country = HighbrowContext.GetCountry(config?.CustomCountry),
-                    OriginalPrice = originalPrice,
-                    Currency = string.IsNullOrWhiteSpace(currency) ? "KRW" : currency.Trim().ToUpperInvariant(),
-                    PriceId = priceId ?? string.Empty,
-                    ProductId = productId,
-                    ProductName = productName ?? string.Empty,
-                    PurchaseTime = HighbrowContext.FormatUtcIsoString(pTime),
-                    ClientVersion = HighbrowContext.GetClientVersion(config?.ClientVersion),
-                    DeviceInfo = HighbrowContext.GetDeviceInfo()
-                };
+                    HighbrowLogger.LogWarning($"[HighbrowLog] RawData skipped: receipt is {receiptId.Length} chars (max {MaxRawDataLength}).");
+                    includeRawData = false;
+                }
 
-                SendLog(PathLogPurchase, "LogStoreReceipt", JsonUtility.ToJson(log));
+                // An unresolved ID without RawData carries no information: do not send it.
+                if (sanitizedReceipt == UnresolvedReceiptId && !includeRawData)
+                {
+                    return;
+                }
+
+                StoreReceiptLog log = includeRawData ? new StoreReceiptSandboxLog { RawData = receiptId } : new StoreReceiptLog();
+                log.Time = HighbrowContext.GetUtcNowIsoString();
+                log.Suid = targetSuid;
+                log.ReceiptId = sanitizedReceipt;
+                log.Market = marketType;
+                log.Os = HighbrowContext.GetOsType();
+                log.Country = HighbrowContext.GetCountry(config?.CustomCountry);
+                log.OriginalPrice = originalPrice;
+                log.Currency = string.IsNullOrWhiteSpace(currency) ? "KRW" : currency.Trim().ToUpperInvariant();
+                log.PriceId = priceId ?? string.Empty;
+                log.ProductId = productId;
+                log.ProductName = productName ?? string.Empty;
+                log.PurchaseTime = HighbrowContext.FormatUtcIsoString(pTime);
+                log.ClientVersion = HighbrowContext.GetClientVersion(config?.ClientVersion);
+                log.DeviceInfo = HighbrowContext.GetDeviceInfo();
+
+                string json = includeRawData ? JsonUtility.ToJson((StoreReceiptSandboxLog)log) : JsonUtility.ToJson(log);
+                SendLog(PathLogPurchase, "LogStoreReceipt", json);
             }
             catch (Exception ex)
             {
@@ -722,11 +746,20 @@ namespace Highbrow.Log
             }
         }
 
-        private static string SanitizeReceiptId(string rawReceiptId)
+        private const int MaxReceiptIdLength = 128;
+        private const int MaxRawDataLength = 8192;
+        private const string UnresolvedReceiptId = "UNRESOLVED";
+
+        /// <summary>
+        /// Resolves the store transaction (order) ID from whatever the game passes.
+        /// Accepts Unity IAP's raw `product.receipt` JSON (recommended: the SDK picks the right ID per store)
+        /// or an already-extracted ID string. Returns empty string (and logs an error) if no valid ID is found.
+        /// </summary>
+        private static string SanitizeReceiptId(string rawReceiptId, int market)
         {
             if (string.IsNullOrWhiteSpace(rawReceiptId))
             {
-                Debug.LogError("[HighbrowLog] TrackPurchase failed: 'receiptId' must not be null or empty. Please pass args.purchasedProduct.transactionID.");
+                Debug.LogError("[HighbrowLog] TrackPurchase failed: 'receiptId' must not be null or empty. Please pass product.receipt (Unity IAP).");
                 return string.Empty;
             }
 
@@ -738,37 +771,89 @@ namespace Highbrow.Log
                 trimmed = trimmed.Substring(1, trimmed.Length - 2).Trim();
             }
 
-            // Unity IAP defensive parsing: If developer passed raw receipt JSON instead of transactionID
+            // Unity IAP raw receipt JSON: pick the correct ID per store.
             if (trimmed.StartsWith("{") && trimmed.EndsWith("}"))
             {
-                try
+                string extracted = ExtractIdFromReceiptJson(trimmed, market);
+                if (string.IsNullOrEmpty(extracted))
                 {
-                    var match = System.Text.RegularExpressions.Regex.Match(
-                        trimmed,
-                        @"(?:\\*""|\b)(?:TransactionID|transactionId|orderId|order_id|txid|paymentId)(?:\\*"")\s*:\s*\\*""([^""\\]+)",
-                        System.Text.RegularExpressions.RegexOptions.IgnoreCase
-                    );
-                    if (match.Success && !string.IsNullOrEmpty(match.Groups[1].Value))
-                    {
-                        HighbrowLogger.Log($"[HighbrowLog] Auto-extracted TransactionID '{match.Groups[1].Value}' from raw JSON receipt.");
-                        return match.Groups[1].Value;
-                    }
+                    // Do NOT send raw JSON fragments to avoid corrupting Snowflake schema
+                    Debug.LogError("[HighbrowLog] TrackPurchase failed: could not find the store order ID (orderId/TransactionID) in the receipt JSON. Please pass product.receipt as is.");
+                    return string.Empty;
                 }
-                catch { }
 
-                // Do NOT send raw JSON fragments to avoid corrupting Snowflake schema
-                Debug.LogError("[HighbrowLog] Invalid receiptId format: The receipt was passed as raw JSON, but failed to extract a transaction ID (orderId/transactionId/txid). Please pass args.purchasedProduct.transactionID directly.");
+                HighbrowLogger.Log($"[HighbrowLog] Extracted order ID '{extracted}' from receipt JSON.");
+                return ClampReceiptId(extracted);
+            }
+
+            return ClampReceiptId(trimmed);
+        }
+
+        private static string ClampReceiptId(string id)
+        {
+            // Never truncate: a cut ID (e.g. a Google purchase token) is wrong data, not a valid order ID.
+            if (id.Length > MaxReceiptIdLength)
+            {
+                Debug.LogError($"[HighbrowLog] TrackPurchase failed: receiptId is {id.Length} chars (max {MaxReceiptIdLength}). This looks like a purchase token, not an order ID. Please pass product.receipt as is.");
                 return string.Empty;
             }
 
-            // Safe length limit (max 128 chars) to protect Snowflake varchar schema from overflow
-            if (trimmed.Length > 128)
+            return id;
+        }
+
+        private static string ExtractIdFromReceiptJson(string json, int market)
+        {
+            string store = MatchJsonString(json, "Store") ?? string.Empty;
+
+            bool isGoogle = store.IndexOf("Google", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            (store.Length == 0 && market == (int)MarketType.GooglePlay);
+            bool isApple = store.IndexOf("Apple", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                           (store.Length == 0 && market == (int)MarketType.AppleStore);
+
+            // Order matters: Unity's wrapper TransactionID can be a purchase token on Google Play,
+            // so Google uses only the orderId inside Payload and never falls back to TransactionID.
+            string[] keys;
+            if (isGoogle)
             {
-                HighbrowLogger.LogWarning($"[HighbrowLog] ReceiptId length ({trimmed.Length}) exceeds 128 characters. Clamping to 128 chars.");
-                return trimmed.Substring(0, 128);
+                keys = new[] { "orderId" };
+            }
+            else if (isApple)
+            {
+                keys = new[] { "TransactionID", "transactionId" };
+            }
+            else
+            {
+                // OneStore and other stores (receipt sample pending): best-effort.
+                keys = new[] { "orderId", "order_id", "purchaseId", "TransactionID", "transactionId", "txid", "paymentId" };
             }
 
-            return trimmed;
+            foreach (string key in keys)
+            {
+                string value = MatchJsonString(json, key);
+                if (!string.IsNullOrEmpty(value))
+                {
+                    return value;
+                }
+            }
+
+            return null;
+        }
+
+        // Matches "key":"value" at any escaping depth (Unity nests the Payload JSON as an escaped string).
+        private static string MatchJsonString(string json, string key)
+        {
+            try
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(
+                    json,
+                    @"(?:\\*""|\b)" + System.Text.RegularExpressions.Regex.Escape(key) + @"\\*""\s*:\s*\\*""([^""\\]+)",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                return match.Success ? match.Groups[1].Value : null;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private string ResolveDuid()

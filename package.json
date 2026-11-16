@@ -1,6 +1,6 @@
 {
   "name": "com.highbrow.sdk",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "displayName": "Highbrow SDK",
   "description": "Integrated client SDK for Highbrow publishing partners. Provides real-time log collection and in-house cross-promotion ad players with clean modular architecture.",
   "unity": "2020.3",

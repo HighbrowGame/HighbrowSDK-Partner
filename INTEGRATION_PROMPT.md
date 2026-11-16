@@ -10,7 +10,7 @@
 ```markdown
 # Role & Objective
 당신은 10년 차 이상의 Unity/C# 시니어 클라이언트 아키텍트이자 데이터 엔지니어입니다.
-외부 파트너 게임 프로젝트에 `HighbrowSDK` (v1.0.1)를 안전하고 결함 없이 연동하는 임무를 맡았습니다.
+외부 파트너 게임 프로젝트에 `HighbrowSDK` (v1.0.2)를 안전하고 결함 없이 연동하는 임무를 맡았습니다.
 
 # Core Architecture & Golden Rules (엄격 준수)
 1. **외과 수술적 수정(Surgical Edits Only):**
@@ -149,9 +149,9 @@ public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs args)
     // 기존 결제 처리 로직 유지...
 
     // HighbrowSDK 결제 로그 연동
-    // 중요: receiptId에는 반드시 args.purchasedProduct.transactionID를 전달하세요!
+    // 중요: receiptId에는 args.purchasedProduct.receipt를 가공 없이 그대로 전달하세요! (SDK가 스토어별 주문번호를 추출합니다. transactionID 사용 금지)
     HighbrowLog.TrackPurchase(
-        receiptId: args.purchasedProduct.transactionID,
+        receiptId: args.purchasedProduct.receipt,
         originalPrice: (float)args.purchasedProduct.metadata.localizedPrice,
         priceId: args.purchasedProduct.definition.id,
         currency: args.purchasedProduct.metadata.isoCurrencyCode, // 스토어 통화 코드 ("KRW", "USD", "JPY" 등)
@@ -162,7 +162,7 @@ public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs args)
     return PurchaseProcessingResult.Complete;
 }
 ```
-> **주의 (스토어 트랜잭션 ID 전달):** `receiptId`에는 반드시 구글 주문번호(`GPA.xxxx-xxxx-xxxx-xxxxx`) 또는 애플 트랜잭션 ID(`args.purchasedProduct.transactionID`)를 전달해야 합니다. Unity IAP의 `args.purchasedProduct.receipt` (raw JSON 전문)을 그대로 넘기면 SDK에서 형식 오류로 거부됩니다.
+> **주의 (영수증 전달):** `receiptId`에는 `args.purchasedProduct.receipt`(raw JSON 전문)를 **가공 없이 그대로** 전달하세요. SDK가 Google은 `orderId`(`GPA.xxxx-xxxx-xxxx-xxxxx`), Apple은 `TransactionID`를 추출합니다. `args.purchasedProduct.transactionID`는 Google Play에서 구매 토큰이 올 수 있어 SDK가 형식 오류로 거부하므로 사용하지 마세요.
 > **자체 결제 검증 서버 사용 시:** 서버 영수증 검증 통신 완료 후 응답받은 스토어 트랜잭션 ID, 결제 금액, 상품 SKU, 통화 코드를 `TrackPurchase`로 전달하세요.
 > **주의 (미처리 결제 복구 시점):** `TrackPurchase`는 유저 식별(`TrackAuth`)이 완료된 상태에서만 수집됩니다. 미처리 결제 복구(Pending/Unconsumed Purchase) 로직은 반드시 **유저 로그인 완료 이후에 실행**되도록 하거나, 로그인 전 호출 시 `suid` 파라미터를 명시적으로 넘겨주세요.
 
@@ -204,7 +204,7 @@ HighbrowAd.Show(
 ## Phase 4. 최종 검증 (Verification)
 1. 컴파일 에러가 없는지 확인합니다.
 2. Unity Editor를 실행했을 때 콘솔에 아래와 같은 1회성 초기화 완료 로그가 뜨는지 확인하도록 안내하세요:
-   `[HighbrowSDK] Initialized v1.0.1 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
+   `[HighbrowSDK] Initialized v1.0.2 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
 3. `TrackAuth` 호출 인자를 점검하세요: `suid`는 유저 고유 ID(빈 값 금지), `accountId`는 게임이 정의한 계정 ID가 있을 때만 전달하고 없으면 `null`(생성 시각·구글 sub ID·애플 user ID 금지), `accountType`은 `AccountType` 열거형 값만 사용(숫자 캐스팅 금지). 로그인 수단이 바뀌어도 같은 유저의 `suid`는 유지되어야 합니다.
 4. Unity Editor 상단 메뉴 `Highbrow > Show Current SDK Status`를 실행하여 초기화 상태와 Server Mode(SANDBOX / PROD)가 정상적으로 표시되는지 확인합니다.
 ```

@@ -135,7 +135,7 @@ public class GameInitializer : MonoBehaviour
 
 > ⚠️ **결제 로그 연동 주의사항:**
 > - `TrackPurchase`는 유저 로그인(`TrackAuth`)이 완료된 이후에만 수집됩니다. 미처리 결제 복구(Pending Purchase) 처리는 반드시 로그인 완료 후에 수행되도록 구성하세요.
-> - `receiptId`에는 raw JSON 영수증 대신 스토어 트랜잭션 ID(`args.purchasedProduct.transactionID`)를 직접 전달하세요.
+> - `receiptId`에는 Unity IAP의 `product.receipt`를 **가공 없이 그대로** 전달하세요. SDK가 스토어별 주문번호를 알아서 추출합니다. (`transactionID`는 Google Play에서 구매 토큰이 올 수 있어 사용하지 마세요.)
 > - `currency`에는 스토어 결제 통화 코드(`args.purchasedProduct.metadata.isoCurrencyCode`)를 전달하세요. (미지정 시 기본값 `"KRW"`)
 
 ---
@@ -160,7 +160,7 @@ public class GameInitializer : MonoBehaviour
 # Instruction
 현재 열려 있는 IAP 관리 스크립트에 `HighbrowSDK` 결제 영수증 로그(`TrackPurchase`)를 연동해줘.
 1. 상단에 `using Highbrow.Log;` 추가.
-2. 결제 완료 시점에 `HighbrowLog.TrackPurchase(receiptId: args.purchasedProduct.transactionID, originalPrice: (float)args.purchasedProduct.metadata.localizedPrice, priceId: args.purchasedProduct.definition.id, currency: args.purchasedProduct.metadata.isoCurrencyCode, productId: internalId, productName: args.purchasedProduct.metadata.localizedTitle);` 호출.
+2. 결제 완료 시점에 `HighbrowLog.TrackPurchase(receiptId: args.purchasedProduct.receipt, originalPrice: (float)args.purchasedProduct.metadata.localizedPrice, priceId: args.purchasedProduct.definition.id, currency: args.purchasedProduct.metadata.isoCurrencyCode, productId: internalId, productName: args.purchasedProduct.metadata.localizedTitle);` 호출.
 ```
 </details>
 

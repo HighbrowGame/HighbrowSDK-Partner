@@ -50,3 +50,8 @@ HighbrowAd.Show(onCompleted: () => { /* reward */ });
 1. **4 Core Fact Logs Only:** Client only emits `Auth`, `Alive` (Auto), `Purchase`, and `Advertise`.
 2. **Server-Derived Metrics:** New User, First Purchase, and DAU/DADU are derived automatically on the Highbrow Collector backend via state DB. Never write client-side logic to determine these.
 3. **Surgical Modifications:** Only add SDK tracking calls at exact success/callback locations without altering surrounding game logic.
+
+## Partner Migration Rule
+1. **CHANGELOG is the channel:** When an SDK change requires partner code changes, add a version entry to `CHANGELOG.md` in the same change (`변경 내용 / 찾는 방법 / 수정 방법 / 사람 판단 필요`, newest on top; write "코드 수정 없음" if none). Partners apply it through the update mode of `INTEGRATION_PROMPT.md`. Do not rely on separate per-partner notices.
+2. **Keep versions and docs in sync:** Bump `package.json` and `SdkVersion`, and keep partner-facing docs (`AGENTS.md`, `README.md`, `INTEGRATION_GUIDE.md`, `INTEGRATION_PROMPT.md`) consistent with the behavior change.
+3. **Update mode exists only from the final v1.0.1 (`6ead54d`):** Partners still on v1.0.0 cannot run it from their installed package. Tell them to change the tag in `Packages/manifest.json` and delete the `packages-lock.json` entry first, then run the update prompt and state their previous version.

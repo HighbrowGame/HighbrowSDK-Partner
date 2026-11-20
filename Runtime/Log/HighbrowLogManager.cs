@@ -62,6 +62,10 @@ namespace Highbrow.Log
         private Coroutine sessionCoroutine;
         private Coroutine flushRetryCoroutine;
         private bool isFlushingQueue = false;
+        private const int MaxFlushAttempts = 3;
+        private const float MaxFlushBackoffSeconds = 600f;
+        private int consecutiveFlushFailures = 0;
+        private float nextAutoFlushTime = 0f;
 
         private readonly object userLock = new object();
         private string currentSuid;
@@ -562,8 +566,21 @@ namespace Highbrow.Log
             while (true)
             {
                 yield return new WaitForSecondsRealtime(config.FlushRetryIntervalSeconds);
-                FlushOfflineQueue();
+                TryAutoFlush();
             }
+        }
+
+        /// <summary>
+        /// Automatic (periodic / resume) flush. Skipped while backing off after failed flushes,
+        /// so a failing server is not hit every interval. Manual FlushOfflineQueue() ignores the backoff.
+        /// </summary>
+        private void TryAutoFlush()
+        {
+            if (Time.unscaledTime < nextAutoFlushTime)
+            {
+                return;
+            }
+            FlushOfflineQueue();
         }
 
         /// <summary>
@@ -604,6 +621,8 @@ namespace Highbrow.Log
         private IEnumerator FlushQueueRoutine(Action<int> onCompleted)
         {
             int successCount = 0;
+            bool flushFailed = false;
+            long failedResponseCode = 0;
             try
             {
                 var batch = offlineQueue.PeekBatch(20);
@@ -625,6 +644,7 @@ namespace Highbrow.Log
 
                     bool isDone = false;
                     bool isSuccess = false;
+                    long itemResponseCode = 0;
 
                     string resolvedEndpoint = ResolveEndpointFromQueuedLog(item.LogType);
                     string logTypeHeader = ExtractLogTypeName(item.LogType);
@@ -632,6 +652,7 @@ namespace Highbrow.Log
                     httpClient.PostJson(resolvedEndpoint, config?.AppKey, logTypeHeader, item.JsonPayload, (success, responseCode, res) =>
                     {
                         isSuccess = success;
+                        itemResponseCode = responseCode;
                         // Permanent 4xx error: Drop item so it does not block the FIFO queue
                         if (!success && responseCode >= 400 && responseCode < 500)
                         {
@@ -652,6 +673,7 @@ namespace Highbrow.Log
                     if (!isDone)
                     {
                         HighbrowLogger.LogWarning($"[HighbrowLog] Queue flush request timed out after {waitElapsed:F1}s. Pausing retry batch.");
+                        flushFailed = true;
                         break;
                     }
 
@@ -662,6 +684,8 @@ namespace Highbrow.Log
                     else
                     {
                         HighbrowLogger.LogWarning("Network error during queue flush. Pausing retry batch.");
+                        flushFailed = true;
+                        failedResponseCode = itemResponseCode;
                         break;
                     }
                 }
@@ -669,6 +693,26 @@ namespace Highbrow.Log
                 if (successCount > 0)
                 {
                     offlineQueue.RemoveProcessed(successCount);
+                }
+
+                if (flushFailed)
+                {
+                    // Server answered with an error (it may even have stored the log): count the attempt and
+                    // drop the item at the limit. Pure connectivity failures (code 0) are not counted so
+                    // logs survive a long offline period; the backoff below still throttles them.
+                    if (failedResponseCode >= 500)
+                    {
+                        offlineQueue.MarkHeadFailed(MaxFlushAttempts);
+                    }
+
+                    consecutiveFlushFailures++;
+                    float delay = config.FlushRetryIntervalSeconds * Mathf.Pow(2f, Mathf.Min(consecutiveFlushFailures, 10));
+                    nextAutoFlushTime = Time.unscaledTime + Mathf.Min(delay, MaxFlushBackoffSeconds);
+                }
+                else
+                {
+                    consecutiveFlushFailures = 0;
+                    nextAutoFlushTime = 0f;
                 }
             }
             finally
@@ -884,7 +928,7 @@ namespace Highbrow.Log
                 {
                     SendUserSessionLog();
                 }
-                FlushOfflineQueue();
+                TryAutoFlush();
             }
         }
 

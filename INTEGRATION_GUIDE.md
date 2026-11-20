@@ -1,5 +1,5 @@
 # Highbrow SDK (Unity Client) 개발사 연동 매뉴얼
-> **문서 버전:** v1.0.2 (최신 패키지 기준)
+> **문서 버전:** v1.0.3 (최신 패키지 기준)
 > **대상 독자:** 파트너사 클라이언트 개발자, 테크니컬 디렉터(TD), QA 엔지니어
 > **지원 환경:** Unity 2020.3 LTS 이상 (Unity 2021, 2022, 2023, Unity 6 완벽 지원)
 > **지원 플랫폼:** Android (Google Play, ONE store, Galaxy Store), iOS (App Store), PC (Steam)
@@ -62,6 +62,7 @@ flowchart LR
 3. **오프라인 큐 & 자동 재시도 (Offline Resilience):**
    - 지하철 음영 지역, 비행기 모드 등 네트워크 단절 상태에서 발생한 로그는 기기 로컬(`PlayerPrefs`)에 최대 300건까지 FIFO 큐로 보관됩니다.
    - 네트워크 연결이 복구되거나 앱으로 복귀(OnApplicationPause)할 때 백그라운드에서 안전하게 자동 재전송됩니다.
+   - 서버 오류(5xx)가 이어지면 재전송 간격이 최대 10분까지 늘어나고, 서버 오류로 3회 재전송에 실패한 로그는 폐기됩니다.
 4. **2단계 자동 엔드포인트 라우팅 (2-Tier Routing):**
    - 개발 및 QA 단계: `UseSandbox = true` (샌드박스 수집 서버)
    - 상용 라이브 배포: `UseSandbox = false` (프로덕션 수집 서버)
@@ -206,7 +207,7 @@ public class TitleSceneManager : MonoBehaviour
 ```
 
 > **성공 확인:** 게임 실행 시 Unity 콘솔창에 아래와 같은 로그가 1회 출력되면 정상 초기화된 것입니다:
-> `[HighbrowSDK] Initialized v1.0.2 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
+> `[HighbrowSDK] Initialized v1.0.3 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
 
 ---
 
@@ -387,7 +388,7 @@ public class AdRewardManager : MonoBehaviour
 ### 1. Unity 콘솔 로그 확인
 Unity Editor에서 Play Mode를 시작했을 때 콘솔창에 다음 로그가 출력되는지 확인합니다:
 ```text
-[HighbrowSDK] Initialized v1.0.2 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)
+[HighbrowSDK] Initialized v1.0.3 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)
 ```
 
 ### 2. 에디터 진단 도구 활용

@@ -12,7 +12,7 @@
 ```markdown
 # Role & Objective
 당신은 10년 차 이상의 Unity/C# 시니어 클라이언트 아키텍트이자 데이터 엔지니어입니다.
-외부 파트너 게임 프로젝트에 `HighbrowSDK` (v1.0.2)를 안전하고 결함 없이 연동하는 임무를 맡았습니다.
+외부 파트너 게임 프로젝트에 `HighbrowSDK` (v1.0.3)를 안전하고 결함 없이 연동하는 임무를 맡았습니다.
 
 # Core Architecture & Golden Rules (엄격 준수)
 1. **외과 수술적 수정(Surgical Edits Only):**
@@ -206,7 +206,7 @@ HighbrowAd.Show(
 ## Phase 4. 최종 검증 (Verification)
 1. 컴파일 에러가 없는지 확인합니다.
 2. Unity Editor를 실행했을 때 콘솔에 아래와 같은 1회성 초기화 완료 로그가 뜨는지 확인하도록 안내하세요:
-   `[HighbrowSDK] Initialized v1.0.2 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
+   `[HighbrowSDK] Initialized v1.0.3 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
 3. `TrackAuth` 호출 인자를 점검하세요: `suid`는 유저 고유 ID(빈 값 금지), `accountId`는 게임이 정의한 계정 ID가 있을 때만 전달하고 없으면 `null`(생성 시각·구글 sub ID·애플 user ID 금지), `accountType`은 `AccountType` 열거형 값만 사용(숫자 캐스팅 금지). 로그인 수단이 바뀌어도 같은 유저의 `suid`는 유지되어야 합니다.
 4. Unity Editor 상단 메뉴 `Highbrow > Show Current SDK Status`를 실행하여 초기화 상태와 Server Mode(SANDBOX / PROD)가 정상적으로 표시되는지 확인합니다.
 ```

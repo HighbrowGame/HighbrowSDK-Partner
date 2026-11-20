@@ -175,4 +175,4 @@ namespace Highbrow.Log
 
 ## 5. Offline & Network Resilience Note
 
-The SDK automatically handles network errors by buffering failed payloads in `PlayerPrefs` (FIFO queue, max 300 logs) and retrying every 30s or upon application resume. Agents do not need to write custom retry or offline caching code.
+The SDK automatically handles network errors by buffering failed payloads in `PlayerPrefs` (FIFO queue, max 300 logs) and retrying every 30s or upon application resume (backing off up to 10 min after failed retries; a log that gets server 5xx errors on 3 resend attempts is dropped). Agents do not need to write custom retry or offline caching code.

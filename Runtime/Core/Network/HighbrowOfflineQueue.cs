@@ -24,6 +24,8 @@ namespace Highbrow.Core.Network
             public string LogType;
             public string JsonPayload;
             public long TimestampTicks;
+            /// <summary>Number of resend attempts that the server answered with an error (5xx).</summary>
+            public int Attempts;
 
             public QueuedLogItem() { }
 
@@ -115,6 +117,27 @@ namespace Highbrow.Core.Network
                     SaveQueueToPrefs(true);
                     HighbrowLogger.Log($"Removed {removeCount} processed logs from offline cache. Remaining: {cachedData.Items.Count}");
                 }
+            }
+        }
+
+        /// <summary>
+        /// Records a server-error resend failure on the head item and drops it once it reaches maxAttempts,
+        /// so one log that keeps failing cannot be resent forever.
+        /// </summary>
+        public void MarkHeadFailed(int maxAttempts)
+        {
+            lock (queueLock)
+            {
+                if (cachedData.Items.Count == 0) return;
+
+                var head = cachedData.Items[0];
+                head.Attempts++;
+                if (head.Attempts >= maxAttempts)
+                {
+                    cachedData.Items.RemoveAt(0);
+                    HighbrowLogger.LogWarning($"Dropping offline log after {head.Attempts} failed resend attempts. Remaining: {cachedData.Items.Count}");
+                }
+                SaveQueueToPrefs(true);
             }
         }
 

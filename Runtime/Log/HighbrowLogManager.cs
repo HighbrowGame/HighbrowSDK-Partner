@@ -68,6 +68,7 @@ namespace Highbrow.Log
         private float nextAutoFlushTime = 0f;
 
         private readonly object userLock = new object();
+        private bool isAuthenticated;
         private string currentSuid;
         private string currentAccountId;
         private AccountType currentAccountType = AccountType.None;
@@ -121,6 +122,11 @@ namespace Highbrow.Log
         {
             if (!IsInitialized) return;
 
+            lock (userLock)
+            {
+                isAuthenticated = false;
+                IsInitialized = false;
+            }
             StopSessionTracking();
 
             if (flushRetryCoroutine != null)
@@ -134,7 +140,6 @@ namespace Highbrow.Log
 
             isFlushingQueue = false;
 
-            IsInitialized = false;
             HighbrowLogger.Log("HighbrowLogManager shutdown complete.");
         }
 
@@ -152,6 +157,7 @@ namespace Highbrow.Log
 
             lock (userLock)
             {
+                if (currentSuid != suid) isAuthenticated = false;
                 currentSuid = suid;
                 if (!string.IsNullOrEmpty(accountId)) currentAccountId = accountId;
                 if (accountType != AccountType.None) currentAccountType = accountType;
@@ -183,12 +189,13 @@ namespace Highbrow.Log
         /// </summary>
         public void ClearUser()
         {
-            StopSessionTracking();
             lock (userLock)
             {
+                isAuthenticated = false;
                 currentSuid = null;
                 currentAccountId = null;
                 currentAccountType = AccountType.None;
+                StopSessionTracking();
             }
             HighbrowLogger.Log("User context cleared.");
         }
@@ -213,8 +220,6 @@ namespace Highbrow.Log
         {
             try
             {
-                if (!EnsureInitialized()) return;
-
                 if (string.IsNullOrWhiteSpace(suid))
                 {
                     Debug.LogError("[HighbrowLog] TrackAuth failed: 'suid' must not be null or empty. A valid unique user ID is required.");
@@ -224,37 +229,50 @@ namespace Highbrow.Log
                 // No separate account is defined by the game, so SUID is used as the AccountId.
                 if (string.IsNullOrWhiteSpace(accountId)) accountId = suid;
 
+                result = result ?? "OK";
+                bool loginSucceeded = string.Equals(result, "OK", StringComparison.OrdinalIgnoreCase);
+
                 lock (userLock)
                 {
-                    // Auth replaces the account context, including Guest(0) and empty AccountId.
+                    if (!EnsureInitialized()) return;
+
+                    AuthLog log = new AuthLog
+                    {
+                        Time = HighbrowContext.GetUtcNowIsoString(),
+                        AccountType = (int)accountType,
+                        AccountId = accountId ?? string.Empty,
+                        Suid = suid,
+                        Duid = string.IsNullOrEmpty(duid) ? ResolveDuid() : duid,
+                        Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
+                        Os = HighbrowContext.GetOsType(),
+                        Country = HighbrowContext.GetCountry(config?.CustomCountry),
+                        IpAddress = ipAddress ?? string.Empty,
+                        Nickname = nickname ?? string.Empty,
+                        DeviceInfo = HighbrowContext.GetDeviceInfo(),
+                        Result = result
+                    };
+
+                    SendLog(PathLogAuth, "LogAuth", JsonUtility.ToJson(log));
+
+                    if (!loginSucceeded) return;
+
+                    // Replace account context only when the game reports a successful login.
                     currentAccountId = accountId;
                     currentAccountType = accountType;
+                    SetUserInfo(suid, accountId, accountType, duid);
+                    isAuthenticated = true;
                 }
-                SetUserInfo(suid, accountId, accountType, duid);
 
-                AuthLog log = new AuthLog
-                {
-                    Time = HighbrowContext.GetUtcNowIsoString(),
-                    AccountType = (int)accountType,
-                    AccountId = accountId ?? string.Empty,
-                    Suid = ResolveSuid(suid),
-                    Duid = ResolveDuid(),
-                    Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
-                    Os = HighbrowContext.GetOsType(),
-                    Country = HighbrowContext.GetCountry(config?.CustomCountry),
-                    IpAddress = ipAddress ?? string.Empty,
-                    Nickname = nickname ?? string.Empty,
-                    DeviceInfo = HighbrowContext.GetDeviceInfo(),
-                    Result = result ?? "OK"
-                };
-
-                SendLog(PathLogAuth, "LogAuth", JsonUtility.ToJson(log));
-
-                // Haegin requirement: Start Alive session tracking shortly after successful Auth
                 if (config != null && config.AutoSessionTracking)
                 {
                     StartSessionTrackingWithDelay(1f, config.SessionIntervalSeconds > 0 ? config.SessionIntervalSeconds : 120f);
                 }
+
+                // Retry any persisted Alive logs held during startup.
+                if (HighbrowDispatcher.IsMainThread)
+                    TryAutoFlush();
+                else
+                    HighbrowDispatcher.Instance?.Enqueue(TryAutoFlush);
             }
             catch (Exception ex)
             {
@@ -421,6 +439,11 @@ namespace Highbrow.Log
                 return;
             }
 
+            lock (userLock)
+            {
+                if (!isAuthenticated) return;
+            }
+
             intervalSeconds = Mathf.Max(5f, intervalSeconds);
             StopSessionTracking();
 
@@ -475,35 +498,23 @@ namespace Highbrow.Log
 
         private void SendUserSessionLog()
         {
-            string suid;
-            string duid;
-            int accountType;
-
             lock (userLock)
             {
-                // Do not emit session alive logs if user has not completed authentication (no active SUID)
-                if (string.IsNullOrEmpty(currentSuid))
+                if (!isAuthenticated) return;
+
+                UserSessionLog log = new UserSessionLog
                 {
-                    return;
-                }
-                suid = currentSuid;
-                duid = !string.IsNullOrEmpty(currentDuid) ? currentDuid : HighbrowContext.GetDuid();
-                currentDuid = duid;
-                accountType = (int)currentAccountType;
+                    Time = HighbrowContext.GetUtcNowIsoString(),
+                    AccountType = (int)currentAccountType,
+                    Suid = currentSuid,
+                    Duid = ResolveDuid(),
+                    Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
+                    Os = HighbrowContext.GetOsType(),
+                    Country = HighbrowContext.GetCountry(config?.CustomCountry)
+                };
+
+                SendLog(PathLogAlive, "LogAlive", JsonUtility.ToJson(log));
             }
-
-            UserSessionLog log = new UserSessionLog
-            {
-                Time = HighbrowContext.GetUtcNowIsoString(),
-                AccountType = accountType,
-                Suid = suid,
-                Duid = duid,
-                Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
-                Os = HighbrowContext.GetOsType(),
-                Country = HighbrowContext.GetCountry(config?.CustomCountry)
-            };
-
-            SendLog(PathLogAlive, "LogAlive", JsonUtility.ToJson(log));
         }
 
         #endregion
@@ -649,18 +660,24 @@ namespace Highbrow.Log
                     string resolvedEndpoint = ResolveEndpointFromQueuedLog(item.LogType);
                     string logTypeHeader = ExtractLogTypeName(item.LogType);
 
-                    httpClient.PostJson(resolvedEndpoint, config?.AppKey, logTypeHeader, item.JsonPayload, (success, responseCode, res) =>
+                    lock (userLock)
                     {
-                        isSuccess = success;
-                        itemResponseCode = responseCode;
-                        // Permanent 4xx error: Drop item so it does not block the FIFO queue
-                        if (!success && responseCode >= 400 && responseCode < 500)
+                        // Keep deferred Alive logs in FIFO order until a login succeeds.
+                        if (logTypeHeader == "LogAlive" && !isAuthenticated) break;
+
+                        httpClient.PostJson(resolvedEndpoint, config?.AppKey, logTypeHeader, item.JsonPayload, (success, responseCode, res) =>
                         {
-                            HighbrowLogger.LogError($"[HighbrowLog] Permanent HTTP {responseCode} error during queue flush. Dropping invalid item from offline cache.");
-                            isSuccess = true; // Mark as processed to remove from queue
-                        }
-                        isDone = true;
-                    });
+                            isSuccess = success;
+                            itemResponseCode = responseCode;
+                            // Permanent 4xx error: Drop item so it does not block the FIFO queue
+                            if (!success && responseCode >= 400 && responseCode < 500)
+                            {
+                                HighbrowLogger.LogError($"[HighbrowLog] Permanent HTTP {responseCode} error during queue flush. Dropping invalid item from offline cache.");
+                                isSuccess = true; // Mark as processed to remove from queue
+                            }
+                            isDone = true;
+                        });
+                    }
 
                     float waitElapsed = 0f;
                     float maxWaitTime = (config != null ? config.HttpTimeoutSeconds : 10) + 5f;
@@ -924,21 +941,14 @@ namespace Highbrow.Log
             else
             {
                 HighbrowLogger.Log("App resumed. Triggering session heartbeat and flushing offline log queue.");
-                if (!string.IsNullOrEmpty(currentSuid))
-                {
-                    SendUserSessionLog();
-                }
+                SendUserSessionLog();
                 TryAutoFlush();
             }
         }
 
         private void HandleApplicationQuit()
         {
-            if (!string.IsNullOrEmpty(currentSuid))
-            {
-                HighbrowLogger.Log("App quitting. Caching final session heartbeat.");
-                SendUserSessionLog();
-            }
+            SendUserSessionLog();
             offlineQueue?.PersistToDisk();
         }
 

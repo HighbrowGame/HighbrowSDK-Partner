@@ -12,7 +12,7 @@
 ```markdown
 # Role & Objective
 당신은 10년 차 이상의 Unity/C# 시니어 클라이언트 아키텍트이자 데이터 엔지니어입니다.
-외부 파트너 게임 프로젝트에 `HighbrowSDK` (v1.0.4)를 안전하고 결함 없이 연동하는 임무를 맡았습니다.
+외부 파트너 게임 프로젝트에 `HighbrowSDK` (v1.1.0)를 안전하고 결함 없이 연동하는 임무를 맡았습니다.
 
 # Core Architecture & Golden Rules (엄격 준수)
 1. **외과 수술적 수정(Surgical Edits Only):**
@@ -143,29 +143,24 @@ HighbrowLog.TrackAuth(
 ### [Step 3] 인앱 결제 완료 연동 (`TrackPurchase`)
 결제 성공/영수증 검증 완료 콜백(예: Unity IAP `ProcessPurchase` 또는 자체 영수증 검증 콜백)에 호출합니다:
 ```csharp
-using Highbrow.Log;
+using Highbrow.Iap;
+using UnityEngine.Purchasing;
 
-// Unity IAP 예시
 public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs args)
 {
-    // 기존 결제 처리 로직 유지...
+    // 기존 결제 검증과 아이템 지급 로직 유지
 
-    // HighbrowSDK 결제 로그 연동
-    // 중요: receiptId에는 args.purchasedProduct.receipt를 가공 없이 그대로 전달하세요! (SDK가 스토어별 주문번호를 추출합니다. transactionID 사용 금지)
-    HighbrowLog.TrackPurchase(
-        receiptId: args.purchasedProduct.receipt,
-        originalPrice: (float)args.purchasedProduct.metadata.localizedPrice,
-        priceId: args.purchasedProduct.definition.id,
-        currency: args.purchasedProduct.metadata.isoCurrencyCode, // 스토어 통화 코드 ("KRW", "USD", "JPY" 등)
-        productId: internalNumericId,     // 게임 내부 숫자 상품 ID (없으면 0)
-        productName: args.purchasedProduct.metadata.localizedTitle
-    );
+    HighbrowIap.TrackPurchase(args.purchasedProduct);
 
     return PurchaseProcessingResult.Complete;
 }
 ```
-> **주의 (영수증 전달):** `receiptId`에는 `args.purchasedProduct.receipt`(raw JSON 전문)를 **가공 없이 그대로** 전달하세요. SDK가 Google은 `orderId`(`GPA.xxxx-xxxx-xxxx-xxxxx`), Apple은 `TransactionID`를 추출합니다. `args.purchasedProduct.transactionID`는 Google Play에서 구매 토큰이 올 수 있어 SDK가 형식 오류로 거부하므로 사용하지 마세요.
-> **자체 결제 검증 서버 사용 시:** 서버 영수증 검증 통신 완료 후 응답받은 스토어 트랜잭션 ID, 결제 금액, 상품 SKU, 통화 코드를 `TrackPurchase`로 전달하세요.
+
+SDK가 같은 상품의 `localizedPrice`와 `isoCurrencyCode`를 함께 읽습니다. 커스텀 `.asmdef`에서 이 API를 호출하면 `Highbrow.Iap`를 참조에 추가하세요.
+
+Unity IAP 5에서는 검증된 주문에 해당하는 상품과 영수증을 `HighbrowIap.TrackPurchase(product, receiptId)`로 전달하세요. Google Play에서는 `order.Info.Receipt`, Apple에서는 검증된 스토어 트랜잭션 ID를 사용할 수 있습니다.
+> **영수증 처리:** Unity IAP 4에서는 SDK가 상품의 영수증을 읽습니다. Google Play 주문번호가 필요한 경우 `orderId`(`GPA.xxxx-xxxx-xxxx-xxxxx`)를 사용하세요.
+> **자체 결제 검증 서버 사용 시:** 검증 완료 콜백에서 `HighbrowLog.TrackPurchase(receiptId: orderId, storeCurrency: verifiedCurrency, storePrice: verifiedAmount, priceId: sku)`를 호출하세요. `storePrice`와 `storeCurrency`는 같은 주문의 검증 응답에서 읽으세요. 기존 `originalPrice` 호출은 새 시그니처로 교체해야 합니다.
 > **주의 (미처리 결제 복구 시점):** `TrackPurchase`는 유저 식별(`TrackAuth`)이 완료된 상태에서만 수집됩니다. 미처리 결제 복구(Pending/Unconsumed Purchase) 로직은 반드시 **유저 로그인 완료 이후에 실행**되도록 하거나, 로그인 전 호출 시 `suid` 파라미터를 명시적으로 넘겨주세요.
 
 ### [Step 4] 기존 광고 미디에이션 시청 완료 연동 (`TrackAd`)
@@ -206,7 +201,7 @@ HighbrowAd.Show(
 ## Phase 4. 최종 검증 (Verification)
 1. 컴파일 에러가 없는지 확인합니다.
 2. Unity Editor를 실행했을 때 콘솔에 아래와 같은 1회성 초기화 완료 로그가 뜨는지 확인하도록 안내하세요:
-   `[HighbrowSDK] Initialized v1.0.4 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
+   `[HighbrowSDK] Initialized v1.1.0 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
 3. `TrackAuth` 호출 인자를 점검하세요: `suid`는 유저 고유 ID(빈 값 금지), `accountId`는 게임이 정의한 계정 ID가 있을 때만 전달하고 없으면 `null`(생성 시각·구글 sub ID·애플 user ID 금지), `accountType`은 `AccountType` 열거형 값만 사용(숫자 캐스팅 금지). 로그인 수단이 바뀌어도 같은 유저의 `suid`는 유지되어야 합니다.
 4. Unity Editor 상단 메뉴 `Highbrow > Show Current SDK Status`를 실행하여 초기화 상태와 Server Mode(SANDBOX / PROD)가 정상적으로 표시되는지 확인합니다.
 ```

@@ -239,6 +239,7 @@ namespace Highbrow.Log
                     AuthLog log = new AuthLog
                     {
                         Time = HighbrowContext.GetUtcNowIsoString(),
+                        SdkVersion = HighbrowSDK.SdkVersion,
                         AccountType = (int)accountType,
                         AccountId = accountId ?? string.Empty,
                         Suid = suid,
@@ -290,14 +291,14 @@ namespace Highbrow.Log
         /// Requires user to be authenticated via TrackAuth first.
         /// </summary>
         /// <param name="receiptId">Unity IAP raw receipt (product.receipt, recommended: the SDK extracts the store order ID) or an already-extracted order ID (Apple transactionId / Google orderId).</param>
-        /// <param name="originalPrice">Product original price in store currency.</param>
+        /// <param name="storeCurrency">ISO 4217 code for the currency of storePrice.</param>
+        /// <param name="storePrice">Amount in the purchase's store currency, paired with storeCurrency.</param>
         /// <param name="priceId">Store item identifier.</param>
-        /// <param name="currency">ISO 4217 Currency code (e.g. "KRW", "USD", "JPY"). Defaults to "KRW".</param>
         /// <param name="productId">Internal game product numeric ID (optional, default: 0).</param>
         /// <param name="productName">Product name string (optional, default: empty).</param>
         /// <param name="purchaseTime">Purchase timestamp (UTC). Defaults to UtcNow.</param>
         /// <param name="suid">Optional SUID override.</param>
-        public void TrackPurchase(string receiptId, float originalPrice, string priceId, string currency = "KRW", int productId = 0, string productName = "", DateTime? purchaseTime = null, string suid = null)
+        public void TrackPurchase(string receiptId, string storeCurrency, float storePrice, string priceId, int productId = 0, string productName = "", DateTime? purchaseTime = null, string suid = null)
         {
             try
             {
@@ -307,6 +308,12 @@ namespace Highbrow.Log
                 if (string.IsNullOrEmpty(targetSuid))
                 {
                     Debug.LogError("[HighbrowLog] TrackPurchase rejected: User is not authenticated. HighbrowLog.TrackAuth must be called upon login before sending purchase logs.");
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(storeCurrency))
+                {
+                    Debug.LogError("[HighbrowLog] TrackPurchase requires the store currency for storePrice.");
                     return;
                 }
 
@@ -350,13 +357,14 @@ namespace Highbrow.Log
                 log.Market = marketType;
                 log.Os = HighbrowContext.GetOsType();
                 log.Country = HighbrowContext.GetCountry(config?.CustomCountry);
-                log.OriginalPrice = originalPrice;
-                log.Currency = string.IsNullOrWhiteSpace(currency) ? "KRW" : currency.Trim().ToUpperInvariant();
+                log.OriginalPrice = storePrice;
+                log.Currency = storeCurrency.Trim().ToUpperInvariant();
                 log.PriceId = priceId ?? string.Empty;
                 log.ProductId = productId;
                 log.ProductName = productName ?? string.Empty;
                 log.PurchaseTime = HighbrowContext.FormatUtcIsoString(pTime);
                 log.ClientVersion = HighbrowContext.GetClientVersion(config?.ClientVersion);
+                log.SdkVersion = HighbrowSDK.SdkVersion;
                 log.DeviceInfo = HighbrowContext.GetDeviceInfo();
 
                 string json = includeRawData ? JsonUtility.ToJson((StoreReceiptSandboxLog)log) : JsonUtility.ToJson(log);
@@ -366,14 +374,6 @@ namespace Highbrow.Log
             {
                 HighbrowLogger.LogError($"[HighbrowLog] Unexpected error in TrackPurchase: {ex.Message}");
             }
-        }
-
-        /// <summary>
-        /// Backwards compatible overload for TrackPurchase with productId as 4th parameter.
-        /// </summary>
-        public void TrackPurchase(string receiptId, float originalPrice, string priceId, int productId, string productName = "", DateTime? purchaseTime = null, string suid = null)
-        {
-            TrackPurchase(receiptId, originalPrice, priceId, "KRW", productId, productName, purchaseTime, suid);
         }
 
         #endregion
@@ -405,6 +405,7 @@ namespace Highbrow.Log
                 AdLog log = new AdLog
                 {
                     Time = HighbrowContext.GetUtcNowIsoString(),
+                    SdkVersion = HighbrowSDK.SdkVersion,
                     Suid = targetSuid,
                     Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
                     Os = HighbrowContext.GetOsType(),
@@ -505,6 +506,7 @@ namespace Highbrow.Log
                 UserSessionLog log = new UserSessionLog
                 {
                     Time = HighbrowContext.GetUtcNowIsoString(),
+                    SdkVersion = HighbrowSDK.SdkVersion,
                     AccountType = (int)currentAccountType,
                     Suid = currentSuid,
                     Duid = ResolveDuid(),

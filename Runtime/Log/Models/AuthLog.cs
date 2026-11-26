@@ -12,6 +12,7 @@ namespace Highbrow.Log
     public class AuthLog
     {
         public string Time;
+        public string SdkVersion;
         public int AccountType;
         public string AccountId;
         public string Suid;

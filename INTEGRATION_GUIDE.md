@@ -1,5 +1,5 @@
 # Highbrow SDK (Unity Client) 개발사 연동 매뉴얼
-> **문서 버전:** v1.0.4 (최신 패키지 기준)
+> **문서 버전:** v1.1.0 (최신 패키지 기준)
 > **대상 독자:** 파트너사 클라이언트 개발자, 테크니컬 디렉터(TD), QA 엔지니어
 > **지원 환경:** Unity 2020.3 LTS 이상 (Unity 2021, 2022, 2023, Unity 6 완벽 지원)
 > **지원 플랫폼:** Android (Google Play, ONE store, Galaxy Store), iOS (App Store), PC (Steam)
@@ -207,7 +207,7 @@ public class TitleSceneManager : MonoBehaviour
 ```
 
 > **성공 확인:** 게임 실행 시 Unity 콘솔창에 아래와 같은 로그가 1회 출력되면 정상 초기화된 것입니다:
-> `[HighbrowSDK] Initialized v1.0.4 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
+> `[HighbrowSDK] Initialized v1.1.0 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)`
 
 ---
 
@@ -263,48 +263,48 @@ public void OnLoginSuccess(string userUid, string userNickname)
 
 #### Case A. Unity IAP (`IStoreListener.ProcessPurchase`) 사용 시
 ```csharp
-using Highbrow.Log;
+using Highbrow.Iap;
 using UnityEngine.Purchasing;
 
 public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs args)
 {
-    // 1. 기존 게임 결제/아이템 지급 로직 유지...
+    // 기존 결제 검증과 아이템 지급 로직 유지
 
-    // 2. Highbrow 결제 로그 전송
-    HighbrowLog.TrackPurchase(
-        receiptId: args.purchasedProduct.receipt,                  // 중요: 영수증 전문을 가공 없이 그대로 전달 (SDK가 주문번호 추출)
-        originalPrice: (float)args.purchasedProduct.metadata.localizedPrice, // 결제 금액
-        priceId: args.purchasedProduct.definition.id,             // 스토어 등록 인앱 SKU
-        currency: args.purchasedProduct.metadata.isoCurrencyCode, // 스토어 결제 통화 ("KRW", "USD" 등)
-        productId: 0,                                             // (선택) 게임 내부 숫자 상품 ID
-        productName: args.purchasedProduct.metadata.localizedTitle// (선택) 상품 표시 이름
-    );
+    HighbrowIap.TrackPurchase(args.purchasedProduct);
 
     return PurchaseProcessingResult.Complete;
 }
 ```
+
+SDK가 같은 상품의 `localizedPrice`와 `isoCurrencyCode`를 함께 읽습니다. 커스텀 `.asmdef`에서 이 API를 호출하면 `Highbrow.Iap`를 참조에 추가하세요.
+
+Unity IAP 5에서는 검증된 주문에 해당하는 상품과 영수증을 `HighbrowIap.TrackPurchase(product, receiptId)`로 전달하세요. Google Play에서는 `order.Info.Receipt`, Apple에서는 검증된 스토어 트랜잭션 ID를 사용할 수 있습니다.
 
 #### Case B. 자체 게임 서버 영수증 검증을 사용하는 경우
 ```csharp
 using Highbrow.Log;
 
 // 게임 서버 영수증 검증 완료 콜백
-public void OnServerPurchaseVerified(string storeTransactionId, float price, string storeSku, string currencyCode, string itemName)
+public void OnServerPurchaseVerified(string storeTransactionId, string storeCurrency, float storePrice, string storeSku, string itemName)
 {
     // Highbrow 결제 로그 전송
     HighbrowLog.TrackPurchase(
         receiptId: storeTransactionId, // 구글 orderId(GPA.xxxx, 구매 토큰 아님) 또는 애플 transactionID
-        originalPrice: price,
+        storeCurrency: storeCurrency,  // 동일 주문에서 금액과 함께 받은 통화 코드
+        storePrice: storePrice,        // 이 주문에서 검증된 스토어 결제 금액
         priceId: storeSku,
-        currency: currencyCode,        // ISO 4217 통화 코드 ("KRW", "USD" 등)
         productName: itemName
     );
 }
 ```
 
 > ⚠️ **결제 연동 핵심 주의사항:**
-> 1. **`receiptId`에는 `args.purchasedProduct.receipt`를 가공 없이 그대로 전달:** SDK가 스토어별로 주문번호(Google `orderId` `GPA.xxxx-xxxx-xxxx-xxxxx`, Apple `TransactionID`)를 추출해 전송합니다(상용 모드에서는 영수증 전문을 전송하지 않으며, 샌드박스에서만 점검용으로 원문도 함께 전송됩니다). **`args.purchasedProduct.transactionID`는 사용하지 마세요.** Google Play에서는 주문번호가 아니라 구매 토큰이 올 수 있고, 128자를 넘는 값은 SDK가 오류로 거부합니다. (자체 검증 서버 사용 시 Case B처럼 Google `orderId`/Apple 트랜잭션 ID를 직접 전달)
+> 1. **Unity IAP 4에서는 SDK가 `Product.receipt`를 읽습니다.** SDK가 스토어별로 주문번호(Google `orderId` `GPA.xxxx-xxxx-xxxx-xxxxx`, Apple `TransactionID`)를 추출해 전송합니다(상용 모드에서는 영수증 전문을 전송하지 않으며, 샌드박스에서만 점검용으로 원문도 함께 전송됩니다). **`args.purchasedProduct.transactionID`는 사용하지 마세요.** Google Play에서는 주문번호가 아니라 구매 토큰이 올 수 있고, 128자를 넘는 값은 SDK가 오류로 거부합니다. (자체 검증 서버 사용 시 Case B처럼 Google `orderId`/Apple 트랜잭션 ID를 직접 전달)
 > 2. **미처리 결제 복구(Pending/Restore) 시점:** `TrackPurchase`는 유저 식별(`TrackAuth`)이 완료된 이후에만 정상 수집됩니다. 앱 기동 시 발생하는 미처리 결제 복구 처리는 반드시 **유저 로그인 완료 이후에 수행**되도록 순서를 맞추어 주세요.
+
+예를 들어 대만 스토어에서 690 TWD에 결제했다면 `storeCurrency: "TWD", storePrice: 690f`를 전달합니다. 서버 환산은 본문의 `OriginalPrice`와 `Currency` 쌍을 사용합니다.
+
+v1.1.0부터 새 Auth, Alive, Purchase, Advertise 로그의 JSON에는 생성 시점의 `SdkVersion`이 포함됩니다. `X-SDK-Version` 헤더는 전송 시점의 SDK 버전이므로, 로그 형식 분기에는 본문의 `SdkVersion`을 사용하세요. 이전 버전에서 저장한 로그를 재전송하면 본문에 `SdkVersion`이 없습니다.
 
 ---
 
@@ -388,7 +388,7 @@ public class AdRewardManager : MonoBehaviour
 ### 1. Unity 콘솔 로그 확인
 Unity Editor에서 Play Mode를 시작했을 때 콘솔창에 다음 로그가 출력되는지 확인합니다:
 ```text
-[HighbrowSDK] Initialized v1.0.4 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)
+[HighbrowSDK] Initialized v1.1.0 successfully. (Mode: PROD, Market: GooglePlay, Country: KR)
 ```
 
 ### 2. 에디터 진단 도구 활용

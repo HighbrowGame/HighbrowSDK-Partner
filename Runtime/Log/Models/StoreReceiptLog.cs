@@ -17,6 +17,7 @@ namespace Highbrow.Log
         public int Market;
         public int Os;
         public string Country;
+        // Store price in Currency, retained under the existing collector field name.
         public float OriginalPrice;
         public string Currency;
         public string PriceId;
@@ -24,6 +25,7 @@ namespace Highbrow.Log
         public string ProductName;
         public string PurchaseTime;
         public string ClientVersion;
+        public string SdkVersion;
         public string DeviceInfo;
     }
 

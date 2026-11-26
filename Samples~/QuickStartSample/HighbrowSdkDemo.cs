@@ -76,14 +76,14 @@ namespace Highbrow.Samples
             HighbrowLog.ClearUser(); // Stops Alive session heartbeat and clears cached IDs
         }
 
-        // 2. Called on in-app purchase success (Unity IAP ProcessPurchase, etc.)
-        public void OnPurchaseSuccess(string receiptId, float originalPrice, string priceId, string currency, int productId, string productName)
+        // 2. Called with a verified purchase from a custom billing integration.
+        public void OnPurchaseSuccess(string receiptId, string storeCurrency, float storePrice, string priceId, int productId, string productName)
         {
             HighbrowLog.TrackPurchase(
                 receiptId: receiptId,
-                originalPrice: originalPrice,
+                storeCurrency: storeCurrency, // Currency returned with storePrice, such as "TWD".
+                storePrice: storePrice, // Verified amount in storeCurrency for this order.
                 priceId: priceId,
-                currency: currency, // e.g. args.purchasedProduct.metadata.isoCurrencyCode ("KRW", "USD")
                 productId: productId,
                 productName: productName,
                 purchaseTime: DateTime.UtcNow

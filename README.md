@@ -130,13 +130,12 @@ public class GameInitializer : MonoBehaviour
 | :--- | :--- | :--- |
 | **1. 인증 로그** | `HighbrowLog.TrackAuth(suid, accountId, accountType, nickname, duid);` | 로그인 완료 시점 호출 (ID 4종 자동 캐싱 & 1초 후 2분 주기 Alive 자동 시작) |
 | **2. 세션 하트비트** | `HighbrowLog.StartSessionTracking();` | 2분 주기 자동 발송 (`AutoSessionTracking = true` 시 TrackAuth 직후 자동 실행) |
-| **3. 결제 영수증** | `HighbrowLog.TrackPurchase(receiptId, originalPrice, priceId, currency, productId, productName);` | IAP 결제 성공 시점 호출 (currency는 `args.purchasedProduct.metadata.isoCurrencyCode` 전달) |
+| **3. 결제 영수증** | `HighbrowIap.TrackPurchase(product);` | Unity IAP 4 결제 검증 완료 시 호출. IAP 5에서는 검증된 주문 영수증 또는 스토어 주문 ID도 전달 |
 | **4. 광고 시청** | `HighbrowLog.TrackAd(adType);` | 광고 시청 완료 시점 호출 (캐시된 SUID 자동 주입) |
 
 > ⚠️ **결제 로그 연동 주의사항:**
 > - `TrackPurchase`는 유저 로그인(`TrackAuth`)이 완료된 이후에만 수집됩니다. 미처리 결제 복구(Pending Purchase) 처리는 반드시 로그인 완료 후에 수행되도록 구성하세요.
-> - `receiptId`에는 Unity IAP의 `product.receipt`를 **가공 없이 그대로** 전달하세요. SDK가 스토어별 주문번호를 알아서 추출합니다. (`transactionID`는 Google Play에서 구매 토큰이 올 수 있어 사용하지 마세요.)
-> - `currency`에는 스토어 결제 통화 코드(`args.purchasedProduct.metadata.isoCurrencyCode`)를 전달하세요. (미지정 시 기본값 `"KRW"`)
+> - Unity IAP는 `Product`에서 가격과 통화를 함께 읽습니다. 자체 결제 연동은 `HighbrowLog.TrackPurchase`에 같은 주문의 `storePrice`와 `storeCurrency`를 함께 전달하세요.
 
 ---
 
@@ -159,8 +158,8 @@ public class GameInitializer : MonoBehaviour
 ```markdown
 # Instruction
 현재 열려 있는 IAP 관리 스크립트에 `HighbrowSDK` 결제 영수증 로그(`TrackPurchase`)를 연동해줘.
-1. 상단에 `using Highbrow.Log;` 추가.
-2. 결제 완료 시점에 `HighbrowLog.TrackPurchase(receiptId: args.purchasedProduct.receipt, originalPrice: (float)args.purchasedProduct.metadata.localizedPrice, priceId: args.purchasedProduct.definition.id, currency: args.purchasedProduct.metadata.isoCurrencyCode, productId: internalId, productName: args.purchasedProduct.metadata.localizedTitle);` 호출.
+1. 상단에 `using Highbrow.Iap;`을 추가. 커스텀 asmdef에서는 `Highbrow.Iap` 참조를 추가.
+2. Unity IAP 4에서는 결제 검증 완료 시 `HighbrowIap.TrackPurchase(args.purchasedProduct);` 호출. Unity IAP 5에서는 해당 주문의 상품과 영수증 또는 스토어 주문 ID를 `HighbrowIap.TrackPurchase(product, receiptId);`에 전달.
 ```
 </details>
 

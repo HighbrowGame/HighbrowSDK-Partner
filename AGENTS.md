@@ -97,15 +97,16 @@ HighbrowSDK.Initialize(config);
 
 ### 3) In-App Purchase (`TrackPurchase`)
 - **Call Location:** In the IAP receipt verification / purchase success callback (e.g. Unity IAP `ProcessPurchase`).
-- **Important:** Pass `product.receipt` (Unity IAP raw receipt JSON) as is to `receiptId`. The SDK extracts the store order ID itself (Google: `orderId` inside Payload, Apple: `TransactionID`). Do NOT pass `transactionID`: on Google Play it can be a purchase token, which the SDK rejects. If you use your own verification server, pass the Google `orderId` (`GPA.xxxx`) or Apple transaction ID.
+- **Unity IAP:** Use `HighbrowIap.TrackPurchase(args.purchasedProduct)` for IAP 4, or `HighbrowIap.TrackPurchase(product, receiptId)` for IAP 5 with the receipt or store order ID for that purchase. The adapter reads price and currency from the same product. Import `Highbrow.Iap` and add the assembly reference when the caller uses a custom asmdef.
+- **Custom purchase verification:** Pass the verified Google `orderId` (`GPA.xxxx`) or Apple transaction ID and the amount in that order's currency to `HighbrowLog.TrackPurchase`.
 - **Prerequisite:** `TrackAuth` must be called upon login before sending purchase logs. Pending/Unconsumed purchase recovery must be executed after user login completes.
 - **Signature:**
   ```csharp
   HighbrowLog.TrackPurchase(
       string receiptId,             // Unity IAP product.receipt as is (required). Or an already-extracted Apple transactionID / Google orderId
-      float originalPrice,          // Product original price (e.g. (float)args.purchasedProduct.metadata.localizedPrice)
+      string storeCurrency,         // Required ISO 4217 code from the same order as storePrice
+      float storePrice,             // Verified order amount in storeCurrency
       string priceId,               // Store item SKU (e.g. "com.game.gem_100")
-      string currency = "KRW",      // ISO 4217 Currency (e.g. args.purchasedProduct.metadata.isoCurrencyCode)
       int productId = 0,            // Internal numeric product ID (optional, default: 0)
       string productName = "",      // Product display name (optional, default: "")
       DateTime? purchaseTime = null,// Null defaults to DateTime.UtcNow

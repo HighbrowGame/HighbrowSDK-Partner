@@ -7,6 +7,15 @@
 
 ---
 
+## 1.1.0
+
+- **변경 내용** · Unity IAP 상품의 가격과 통화를 한 번에 읽는 `HighbrowIap.TrackPurchase`를 추가했습니다. Unity IAP 4 또는 5가 설치된 프로젝트에서 사용할 수 있습니다.
+- 새로 생성하는 Auth, Alive, Purchase, Advertise 로그 JSON에 `SdkVersion`을 포함합니다. 기존 큐 로그는 생성 당시의 JSON으로 재전송합니다.
+- 기존 `originalPrice` 하나를 받는 두 오버로드를 제거했습니다. 자체 결제 연동은 `storePrice`와 `storeCurrency`를 같은 검증 주문에서 필수로 전달합니다.
+- **찾는 방법** · 결제 완료 콜백의 `HighbrowLog.TrackPurchase`와 `HighbrowLog.Manager.TrackPurchase` 호출을 확인하세요.
+- **수정 방법** · IAP 4는 `HighbrowIap.TrackPurchase(args.purchasedProduct)`로 교체하세요. IAP 5는 해당 주문의 상품과 영수증 또는 스토어 주문 ID를 전달하세요. 커스텀 asmdef는 `Highbrow.Iap`를 참조해야 합니다.
+- **사람 판단 필요** · 자체 검증 서버 연동은 위의 새 인자를 사용하세요. `OriginalPrice`와 `Currency`에는 같은 주문의 스토어 금액과 통화가 들어갑니다.
+
 ## 1.0.4
 
 - **변경 내용:** 현재 앱 실행에서 로그인 성공을 알리는 `TrackAuth` 호출 이후에만 Alive를 전송합니다. 이전 실행에서 저장된 Alive와 큐에서 그 뒤에 있는 로그는 순서를 유지하기 위해 로그인 성공까지 보관합니다.

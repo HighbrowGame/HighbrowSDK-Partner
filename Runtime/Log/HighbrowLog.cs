@@ -87,26 +87,19 @@ namespace Highbrow.Log
         /// Tracks in-app purchase store receipt.
         /// Backend automatically derives First Purchase (New Paying) metrics.
         /// </summary>
-        public static void TrackPurchase(string receiptId, float originalPrice, string priceId, string currency = "KRW", int productId = 0, string productName = "", DateTime? purchaseTime = null, string suid = null)
+        /// <param name="receiptId">Verified receipt or store order ID for this purchase.</param>
+        /// <param name="storeCurrency">ISO 4217 currency for storePrice, from the same source.</param>
+        /// <param name="storePrice">Amount in the purchase's store currency, paired with storeCurrency. Use the verified transaction amount for custom integrations.</param>
+        /// <param name="priceId">Store item SKU.</param>
+        /// <param name="productId">Optional internal product ID.</param>
+        /// <param name="productName">Optional display name.</param>
+        /// <param name="purchaseTime">Optional purchase time, defaults to UTC now.</param>
+        /// <param name="suid">Optional user ID override.</param>
+        public static void TrackPurchase(string receiptId, string storeCurrency, float storePrice, string priceId, int productId = 0, string productName = "", DateTime? purchaseTime = null, string suid = null)
         {
             try
             {
-                Manager.TrackPurchase(receiptId, originalPrice, priceId, currency, productId, productName, purchaseTime, suid);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[HighbrowLog] Error in TrackPurchase: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Backwards compatible overload for TrackPurchase with productId as 4th parameter.
-        /// </summary>
-        public static void TrackPurchase(string receiptId, float originalPrice, string priceId, int productId, string productName = "", DateTime? purchaseTime = null, string suid = null)
-        {
-            try
-            {
-                Manager.TrackPurchase(receiptId, originalPrice, priceId, "KRW", productId, productName, purchaseTime, suid);
+                Manager.TrackPurchase(receiptId, storeCurrency, storePrice, priceId, productId, productName, purchaseTime, suid);
             }
             catch (Exception ex)
             {

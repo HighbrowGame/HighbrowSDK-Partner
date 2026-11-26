@@ -1,0 +1,24 @@
+{
+    "name": "Highbrow.Iap",
+    "rootNamespace": "Highbrow.Iap",
+    "references": [
+        "Highbrow.Log",
+        "UnityEngine.Purchasing",
+        "Unity.Purchasing"
+    ],
+    "defineConstraints": [
+        "HIGHBROW_UNITY_IAP"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.purchasing",
+            "expression": "[4.0.0,6.0.0)",
+            "define": "HIGHBROW_UNITY_IAP"
+        },
+        {
+            "name": "com.unity.purchasing",
+            "expression": "[4.0.0,5.0.0)",
+            "define": "HIGHBROW_UNITY_IAP_V4"
+        }
+    ]
+}

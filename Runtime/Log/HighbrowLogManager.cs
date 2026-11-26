@@ -236,9 +236,11 @@ namespace Highbrow.Log
                 {
                     if (!EnsureInitialized()) return;
 
+                    DateTimeOffset logTime = DateTimeOffset.UtcNow;
                     AuthLog log = new AuthLog
                     {
-                        Time = HighbrowContext.GetUtcNowIsoString(),
+                        Time = HighbrowContext.FormatUtcIsoString(logTime.UtcDateTime),
+                        UnixTimestampMs = logTime.ToUnixTimeMilliseconds(),
                         SdkVersion = HighbrowSDK.SdkVersion,
                         AccountType = (int)accountType,
                         AccountId = accountId ?? string.Empty,
@@ -350,8 +352,10 @@ namespace Highbrow.Log
                     return;
                 }
 
+                DateTimeOffset logTime = DateTimeOffset.UtcNow;
                 StoreReceiptLog log = includeRawData ? new StoreReceiptSandboxLog { RawData = receiptId } : new StoreReceiptLog();
-                log.Time = HighbrowContext.GetUtcNowIsoString();
+                log.Time = HighbrowContext.FormatUtcIsoString(logTime.UtcDateTime);
+                log.UnixTimestampMs = logTime.ToUnixTimeMilliseconds();
                 log.Suid = targetSuid;
                 log.ReceiptId = sanitizedReceipt;
                 log.Market = marketType;
@@ -402,9 +406,11 @@ namespace Highbrow.Log
 
                 string adTypeName = !string.IsNullOrEmpty(customAdTypeName) ? customAdTypeName : adType.ToString();
 
+                DateTimeOffset logTime = DateTimeOffset.UtcNow;
                 AdLog log = new AdLog
                 {
-                    Time = HighbrowContext.GetUtcNowIsoString(),
+                    Time = HighbrowContext.FormatUtcIsoString(logTime.UtcDateTime),
+                    UnixTimestampMs = logTime.ToUnixTimeMilliseconds(),
                     SdkVersion = HighbrowSDK.SdkVersion,
                     Suid = targetSuid,
                     Market = HighbrowContext.GetMarketType(config != null ? config.Market : MarketType.None, config?.CustomMarket),
@@ -503,9 +509,11 @@ namespace Highbrow.Log
             {
                 if (!isAuthenticated) return;
 
+                DateTimeOffset logTime = DateTimeOffset.UtcNow;
                 UserSessionLog log = new UserSessionLog
                 {
-                    Time = HighbrowContext.GetUtcNowIsoString(),
+                    Time = HighbrowContext.FormatUtcIsoString(logTime.UtcDateTime),
+                    UnixTimestampMs = logTime.ToUnixTimeMilliseconds(),
                     SdkVersion = HighbrowSDK.SdkVersion,
                     AccountType = (int)currentAccountType,
                     Suid = currentSuid,

@@ -12,6 +12,7 @@ namespace Highbrow.Log
     public class UserSessionLog
     {
         public string Time;
+        public long UnixTimestampMs;
         public string SdkVersion;
         public int AccountType;
         public string Suid;

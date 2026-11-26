@@ -12,6 +12,7 @@ namespace Highbrow.Log
     public class StoreReceiptLog
     {
         public string Time;
+        public long UnixTimestampMs;
         public string Suid;
         public string ReceiptId;
         public int Market;

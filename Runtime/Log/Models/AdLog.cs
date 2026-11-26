@@ -12,6 +12,7 @@ namespace Highbrow.Log
     public class AdLog
     {
         public string Time;
+        public long UnixTimestampMs;
         public string SdkVersion;
         public string Suid;
         public int Market;
